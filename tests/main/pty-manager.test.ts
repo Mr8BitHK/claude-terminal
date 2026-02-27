@@ -29,9 +29,11 @@ describe('PtyManager', () => {
       CLAUDE_TERMINAL_TAB_ID: 'tab-1',
     });
 
+    // On Windows, spawns through cmd.exe; on other platforms, spawns claude directly
+    const isWindows = process.platform === 'win32';
     expect(pty.spawn).toHaveBeenCalledWith(
-      'claude',
-      ['--dangerously-skip-permissions'],
+      isWindows ? 'cmd.exe' : 'claude',
+      isWindows ? ['/c', 'claude', '--dangerously-skip-permissions'] : ['--dangerously-skip-permissions'],
       expect.objectContaining({
         cwd: 'D:\\dev\\MyApp',
         env: expect.objectContaining({

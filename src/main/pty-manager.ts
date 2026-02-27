@@ -14,10 +14,15 @@ export class PtyManager {
     args: string[],
     extraEnv: Record<string, string>,
   ): pty.IPty {
-    const shell = 'claude';
     const env = { ...process.env, ...extraEnv } as Record<string, string>;
 
-    const proc = pty.spawn(shell, args, {
+    // On Windows, `claude` is a .cmd wrapper. node-pty can't resolve .cmd
+    // files directly, so we spawn through the system shell.
+    const isWindows = process.platform === 'win32';
+    const shell = isWindows ? 'cmd.exe' : 'claude';
+    const spawnArgs = isWindows ? ['/c', 'claude', ...args] : args;
+
+    const proc = pty.spawn(shell, spawnArgs, {
       name: 'xterm-256color',
       cols: 120,
       rows: 40,

@@ -11,6 +11,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
+    "watch": "electron-forge start",
     "test": "vitest run",
     "test:watch": "vitest"
   },
