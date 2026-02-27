@@ -4,14 +4,12 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { terminalCache } from './terminalCache';
 
 interface TerminalProps {
   tabId: string;
   isVisible: boolean;
 }
-
-// Cache terminals per tabId so switching tabs preserves scrollback
-const terminalCache = new Map<string, { term: XTerm; fitAddon: FitAddon }>();
 
 // Single global PTY data listener (registered once, not per component)
 let ptyListenerRegistered = false;
@@ -25,14 +23,6 @@ function ensurePtyListener(): void {
       cached.term.write(data);
     }
   });
-}
-
-export function destroyTerminal(tabId: string): void {
-  const cached = terminalCache.get(tabId);
-  if (cached) {
-    cached.term.dispose();
-    terminalCache.delete(tabId);
-  }
 }
 
 export default function Terminal({ tabId, isVisible }: TerminalProps) {
@@ -79,12 +69,21 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
       term.loadAddon(fitAddon);
       term.loadAddon(new WebLinksAddon());
 
+      // Let app-level shortcuts pass through to the window handler
+      term.attachCustomKeyEventHandler((e) => {
+        if (e.ctrlKey && (e.key === 'w' || e.key === 't' || e.key === 'Tab'))
+          return false;
+        if (e.ctrlKey && e.key >= '1' && e.key <= '9') return false;
+        if (e.key === 'F2') return false;
+        return true;
+      });
+
       // Forward keyboard input to PTY
       term.onData((data) => {
         window.claudeTerminal.writeToPty(tabId, data);
       });
 
-      cached = { term, fitAddon };
+      cached = { term, fitAddon, webglLoaded: false };
       terminalCache.set(tabId, cached);
     }
 
@@ -93,15 +92,35 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
     // Ensure the global PTY data listener is registered
     ensurePtyListener();
 
-    // If already attached to this container, just fit
-    if (attachedRef.current === tabId && container.querySelector('.xterm')) {
+    // Helper: fit terminal and sync PTY dimensions
+    const fitAndSync = () => {
       fitAddon.fit();
-      return;
-    }
+      if (term.cols > 0 && term.rows > 0) {
+        window.claudeTerminal.resizePty(tabId, term.cols, term.rows);
+      }
+    };
 
-    // Clear container and attach
-    container.innerHTML = '';
-    term.open(container);
+    // If already attached to this container, just fit and set up resize observer
+    const alreadyAttached =
+      attachedRef.current === tabId && container.querySelector('.xterm');
+
+    if (!alreadyAttached) {
+      // Clear container and attach
+      container.innerHTML = '';
+      term.open(container);
+
+      // Try to load WebGL addon BEFORE fitting (changes character metrics)
+      if (!cached.webglLoaded) {
+        try {
+          term.loadAddon(new WebglAddon());
+          cached.webglLoaded = true;
+        } catch {
+          // WebGL not available, use canvas renderer
+        }
+      }
+
+      attachedRef.current = tabId;
+    }
 
     // Right-click copies selected text to clipboard
     const handleContextMenu = (e: MouseEvent) => {
@@ -113,27 +132,23 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
     };
     container.addEventListener('contextmenu', handleContextMenu);
 
-    // Try to load WebGL addon (falls back gracefully)
-    try {
-      term.loadAddon(new WebglAddon());
-    } catch {
-      // WebGL not available, use canvas renderer
-    }
+    // Defer initial fit to next frame so the container has final layout dimensions
+    const rafId = requestAnimationFrame(() => {
+      fitAndSync();
+    });
 
-    fitAddon.fit();
-    attachedRef.current = tabId;
-
-    // Report initial size to PTY
-    window.claudeTerminal.resizePty(tabId, term.cols, term.rows);
-
-    // Handle resize
+    // Handle resize — always set up observer (even for already-attached terminals)
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
-      window.claudeTerminal.resizePty(tabId, term.cols, term.rows);
+      // Debounce rapid resize events to avoid flooding the PTY
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(fitAndSync, 50);
     });
     resizeObserver.observe(container);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(resizeTimeout);
       resizeObserver.disconnect();
       container.removeEventListener('contextmenu', handleContextMenu);
     };
