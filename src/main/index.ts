@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron';
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
@@ -115,6 +117,14 @@ function notifyTabActivity(tabId: string, title: string, body: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: clean up naming flag file for a tab
+// ---------------------------------------------------------------------------
+function cleanupNamingFlag(tabId: string) {
+  const flagFile = path.join(os.tmpdir(), `claude-terminal-named-${tabId}`);
+  fs.unlink(flagFile, () => {}); // best-effort, ignore errors
+}
+
+// ---------------------------------------------------------------------------
 // Helper: generate a smart tab name using Claude Haiku
 // ---------------------------------------------------------------------------
 function generateTabName(tabId: string, prompt: string) {
@@ -186,6 +196,7 @@ function handleHookMessage(msg: IpcMessage) {
       break;
 
     case 'tab:closed':
+      cleanupNamingFlag(tabId);
       tabManager.removeTab(tabId);
       ptyManager.kill(tabId);
       sendToRenderer('tab:removed', tabId);
@@ -265,6 +276,7 @@ function registerIpcHandlers() {
 
     // When the PTY exits, clean up.
     proc.onExit(() => {
+      cleanupNamingFlag(tab.id);
       tabManager.removeTab(tab.id);
       sendToRenderer('tab:removed', tab.id);
     });
@@ -280,6 +292,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('tab:close', async (_event, tabId: string) => {
     ptyManager.kill(tabId);
+    cleanupNamingFlag(tabId);
     const tab = tabManager.getTab(tabId);
     if (tab?.worktree && worktreeManager) {
       try {
@@ -394,6 +407,11 @@ app.on('window-all-closed', async () => {
     if (savedTabs.length > 0) {
       settings.saveSessions(workspaceDir, savedTabs);
     }
+  }
+
+  // Clean up all naming flag files
+  for (const tab of tabManager.getAllTabs()) {
+    cleanupNamingFlag(tab.id);
   }
 
   ptyManager.killAll();
