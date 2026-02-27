@@ -12,7 +12,7 @@ export class TabManager {
   createTab(cwd: string, worktree: string | null): Tab {
     const id = generateId();
     const name = worktree ?? `Tab ${this.nextTabNum++}`;
-    const tab: Tab = { id, name, status: 'new', worktree, cwd, pid: null };
+    const tab: Tab = { id, name, status: 'new', worktree, cwd, pid: null, sessionId: null };
     this.tabs.set(id, tab);
     if (!this.activeTabId) {
       this.activeTabId = id;
@@ -36,6 +36,11 @@ export class TabManager {
   rename(id: string, name: string): void {
     const tab = this.tabs.get(id);
     if (tab) tab.name = name;
+  }
+
+  setSessionId(id: string, sessionId: string): void {
+    const tab = this.tabs.get(id);
+    if (tab) tab.sessionId = sessionId;
   }
 
   removeTab(id: string): void {

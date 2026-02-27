@@ -14,6 +14,7 @@ describe('shared types', () => {
       worktree: null,
       cwd: '/some/path',
       pid: null,
+      sessionId: null,
     };
     expect(tab.id).toBe('tab-1');
     expect(tab.worktree).toBeNull();

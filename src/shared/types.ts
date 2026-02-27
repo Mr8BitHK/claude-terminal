@@ -9,6 +9,14 @@ export interface Tab {
   worktree: string | null;
   cwd: string;
   pid: number | null;
+  sessionId: string | null;
+}
+
+export interface SavedTab {
+  name: string;
+  cwd: string;
+  worktree: string | null;
+  sessionId: string;
 }
 
 export interface IpcMessage {

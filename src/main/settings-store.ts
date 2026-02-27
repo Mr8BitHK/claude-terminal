@@ -1,18 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
-import { PermissionMode } from '@shared/types';
+import { PermissionMode, SavedTab } from '@shared/types';
 
 const MAX_RECENT_DIRS = 10;
 
 interface StoreData {
   recentDirs: string[];
   permissionMode: PermissionMode;
+  sessions: Record<string, SavedTab[]>;
 }
 
 const DEFAULTS: StoreData = {
   recentDirs: [],
   permissionMode: 'bypassPermissions',
+  sessions: {},
 };
 
 export class SettingsStore {
@@ -56,6 +58,20 @@ export class SettingsStore {
 
   setPermissionMode(mode: PermissionMode): void {
     this.data.permissionMode = mode;
+    this.save();
+  }
+
+  getSessions(dir: string): SavedTab[] {
+    return this.data.sessions[dir] ?? [];
+  }
+
+  saveSessions(dir: string, tabs: SavedTab[]): void {
+    this.data.sessions[dir] = tabs;
+    this.save();
+  }
+
+  clearSessions(dir: string): void {
+    delete this.data.sessions[dir];
     this.save();
   }
 }
