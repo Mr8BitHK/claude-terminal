@@ -45,8 +45,12 @@ function parseCliStartDir(): string | null {
     if (arg.toLowerCase().includes('electron')) continue;
     // Skip common Forge / Vite dev paths
     if (arg.includes('.vite') || arg.includes('node_modules')) continue;
-    // Treat anything remaining as a directory path
-    return arg;
+    // Only accept it if it's an actual directory on disk
+    try {
+      if (fs.statSync(arg).isDirectory()) return arg;
+    } catch {
+      // Not a valid path — skip
+    }
   }
   return null;
 }
@@ -287,7 +291,6 @@ function registerIpcHandlers() {
       if (mainWindow) {
         mainWindow.setTitle(`ClaudeTerminal - ${dir}`);
       }
-      settings.addRecentDir(dir);
       settings.setPermissionMode(mode);
       worktreeManager = new WorktreeManager(dir);
       // In dev, __dirname is .vite/build/ — go up to project root.
@@ -341,6 +344,9 @@ function registerIpcHandlers() {
     // Spawn the Claude PTY.
     const proc = ptyManager.spawn(tab.id, cwd, args, extraEnv);
     tab.pid = proc.pid;
+
+    // Add workspace to recent dirs now that a tab is actually running.
+    settings.addRecentDir(workspaceDir!);
 
     // Forward PTY output to the renderer.
     proc.onData((data: string) => {
