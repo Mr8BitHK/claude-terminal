@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { PIPE_NAME } from '@shared/types';
 
 export class HookInstaller {
   private hooksDir: string;
@@ -9,47 +8,52 @@ export class HookInstaller {
     this.hooksDir = hooksDir;
   }
 
-  install(targetDir: string, tabId: string): void {
+  install(targetDir: string): void {
     const claudeDir = path.join(targetDir, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
 
+    // Hook scripts read CLAUDE_TERMINAL_TAB_ID and CLAUDE_TERMINAL_PIPE
+    // from environment variables (set on the PTY process) to avoid
+    // Windows cmd.exe backslash mangling in CLI arguments.
     const hookCommand = (scriptName: string) =>
-      `bash "${path.join(this.hooksDir, scriptName)}" "${tabId}" "${PIPE_NAME}"`;
+      `node "${path.join(this.hooksDir, scriptName)}"`;
 
     const settings = {
       hooks: {
         SessionStart: [
           {
-            matcher: 'startup',
-            hooks: [{ type: 'command', command: hookCommand('on-session-start.sh'), timeout: 10 }],
+            matcher: '',
+            hooks: [{ type: 'command', command: hookCommand('on-session-start.js'), timeout: 10 }],
           },
         ],
         UserPromptSubmit: [
           {
-            hooks: [{ type: 'command', command: hookCommand('on-prompt-submit.sh'), timeout: 10 }],
+            matcher: '',
+            hooks: [{ type: 'command', command: hookCommand('on-prompt-submit.js'), timeout: 10 }],
           },
         ],
         PreToolUse: [
           {
-            hooks: [{ type: 'command', command: hookCommand('on-tool-use.sh'), timeout: 10 }],
+            matcher: '',
+            hooks: [{ type: 'command', command: hookCommand('on-tool-use.js'), timeout: 10 }],
           },
         ],
         Stop: [
           {
-            hooks: [{ type: 'command', command: hookCommand('on-stop.sh'), timeout: 10 }],
+            matcher: '',
+            hooks: [{ type: 'command', command: hookCommand('on-stop.js'), timeout: 10 }],
           },
         ],
         Notification: [
           {
-            matcher: 'idle_prompt',
-            hooks: [
-              { type: 'command', command: hookCommand('on-notification.sh'), timeout: 10 },
-            ],
+            matcher: '',
+            hooks: [{ type: 'command', command: hookCommand('on-notification.js'), timeout: 10 }],
           },
         ],
         SessionEnd: [
           {
-            hooks: [{ type: 'command', command: hookCommand('on-session-end.sh'), timeout: 10 }],
+            matcher: '',
+            hooks: [{ type: 'command', command: hookCommand('on-session-end.js'), timeout: 10 }],
           },
         ],
       },

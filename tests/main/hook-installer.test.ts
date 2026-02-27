@@ -24,7 +24,7 @@ describe('HookInstaller', () => {
   });
 
   it('writes settings.local.json to target directory', () => {
-    installer.install('D:\\dev\\MyApp', 'tab-1');
+    installer.install('D:\\dev\\MyApp');
 
     expect(fs.mkdirSync).toHaveBeenCalledWith(
       expect.stringContaining('.claude'),
@@ -38,7 +38,7 @@ describe('HookInstaller', () => {
   });
 
   it('generates valid JSON with all required hooks', () => {
-    installer.install('D:\\dev\\MyApp', 'tab-1');
+    installer.install('D:\\dev\\MyApp');
 
     const writeCall = vi.mocked(fs.writeFileSync).mock.calls[0];
     const content = JSON.parse(writeCall[1] as string);
@@ -52,11 +52,12 @@ describe('HookInstaller', () => {
     expect(content.hooks.SessionEnd).toBeDefined();
   });
 
-  it('includes tab ID in hook commands', () => {
-    installer.install('D:\\dev\\MyApp', 'tab-42');
+  it('uses node commands for hook scripts', () => {
+    installer.install('D:\\dev\\MyApp');
 
     const writeCall = vi.mocked(fs.writeFileSync).mock.calls[0];
     const content = writeCall[1] as string;
-    expect(content).toContain('tab-42');
+    expect(content).toContain('node');
+    expect(content).toContain('.js');
   });
 });

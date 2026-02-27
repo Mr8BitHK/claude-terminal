@@ -1,5 +1,6 @@
 import net from 'net';
 import { IpcMessage } from '@shared/types';
+import { log } from './logger';
 
 type MessageHandler = (msg: IpcMessage) => void;
 
@@ -18,6 +19,7 @@ export class HookIpcServer {
         let buffer = '';
         socket.on('data', (chunk) => {
           buffer += chunk.toString();
+          log.debug('[ipc-raw]', chunk.toString().substring(0, 200));
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
           for (const line of lines) {
@@ -26,7 +28,7 @@ export class HookIpcServer {
               const msg = JSON.parse(line) as IpcMessage;
               this.handlers.forEach((h) => h(msg));
             } catch {
-              // ignore malformed messages
+              log.warn('[ipc-parse-error]', line.substring(0, 200));
             }
           }
         });

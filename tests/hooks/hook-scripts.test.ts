@@ -1,15 +1,18 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import net from 'net';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import path from 'path';
 import { IpcMessage } from '@shared/types';
 
-function execAsync(cmd: string, timeout = 10000): Promise<string> {
+function execNodeScript(scriptPath: string, args: string[], env: Record<string, string>, timeout = 10000): Promise<string> {
   return new Promise((resolve, reject) => {
-    exec(cmd, { timeout, shell: 'bash' }, (err, stdout) => {
+    execFile('node', [scriptPath, ...args], {
+      timeout,
+      env: { ...process.env, ...env },
+    }, (err, stdout) => {
       if (err && err.killed) {
-        reject(new Error(`Command timed out: ${cmd}`));
+        reject(new Error(`Command timed out: node ${scriptPath}`));
       } else if (err) {
         reject(err);
       } else {
@@ -20,7 +23,6 @@ function execAsync(cmd: string, timeout = 10000): Promise<string> {
 }
 
 describe('hook scripts integration', () => {
-  // Use forward-slash pipe notation for reliable cross-layer escaping (bash -> node)
   const TEST_PIPE = '//./pipe/claude-terminal-hook-test-' + process.pid;
   let server: net.Server;
   let received: IpcMessage[];
@@ -46,9 +48,12 @@ describe('hook scripts integration', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it('pipe-send.sh sends valid IPC message', async () => {
-    const scriptPath = path.resolve('src/hooks/pipe-send.sh').replace(/\\/g, '/');
-    await execAsync(`bash "${scriptPath}" "tab-1" "${TEST_PIPE}" "tab:status:working"`);
+  it('pipe-send.js sends valid IPC message via env vars', async () => {
+    const scriptPath = path.resolve('src/hooks/pipe-send.js');
+    await execNodeScript(scriptPath, ['tab:status:working'], {
+      CLAUDE_TERMINAL_TAB_ID: 'tab-1',
+      CLAUDE_TERMINAL_PIPE: TEST_PIPE,
+    });
 
     // Give the message time to arrive
     await new Promise(resolve => setTimeout(resolve, 500));

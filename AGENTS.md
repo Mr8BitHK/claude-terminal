@@ -32,10 +32,10 @@ src/
   shared/
     types.ts       # Shared types: Tab, TabStatus, PermissionMode, IpcMessage
   preload.ts       # contextBridge API (18 methods)
-  hooks/           # Shell scripts invoked by Claude Code hooks
-    pipe-send.sh   # Shared helper: sends JSON to named pipe via Node.js
-    on-session-start.sh, on-prompt-submit.sh, on-tool-use.sh,
-    on-stop.sh, on-notification.sh, on-session-end.sh
+  hooks/           # Node.js scripts invoked by Claude Code hooks
+    pipe-send.js   # Shared helper: sends JSON to named pipe
+    on-session-start.js, on-prompt-submit.js, on-tool-use.js,
+    on-stop.js, on-notification.js, on-session-end.js
 tests/             # Mirrors src/ structure, 40 tests across 9 files
 ```
 
@@ -43,7 +43,10 @@ tests/             # Mirrors src/ structure, 40 tests across 9 files
 
 - **node-pty on Windows**: Must spawn `cmd.exe /c claude` because node-pty cannot resolve `.cmd` wrappers directly.
 - **No electron-store**: Replaced with plain `fs.readFileSync`/`fs.writeFileSync` JSON store. electron-store v11 ESM-only export causes "Store is not a constructor" in Electron's CJS context.
-- **Hook communication**: Claude Code hooks -> shell scripts -> Windows named pipe -> main process -> renderer. No output parsing.
+- **Hook communication**: Claude Code hooks -> Node.js scripts -> Windows named pipe -> main process -> renderer. No output parsing.
+- **Hooks MUST be Node.js, not bash**: Claude Code on Windows executes hook commands via `cmd.exe`. `bash` is NOT in the Windows PATH (it lives inside Git Bash/MSYS2). `node` IS in the PATH. All hook scripts must be `.js` files invoked with `node`, never `.sh` files invoked with `bash`.
+- **Hook args: use env vars, not CLI args for paths**: Windows cmd.exe mangles backslashes in CLI arguments (e.g., `\\.\pipe\name` becomes `\.\pipe\name`). Hook scripts read `CLAUDE_TERMINAL_TAB_ID` and `CLAUDE_TERMINAL_PIPE` from environment variables (set on the PTY process, inherited by Claude Code and its hook subprocesses) to avoid this.
+- **Electron Forge `app.getAppPath()`**: In dev mode with Vite, returns `.vite/build/`, NOT the project root. Use `__dirname` with relative traversal to find project files (e.g., `path.join(__dirname, '..', '..', 'src', 'hooks')`).
 - **Terminal caching**: xterm.js instances are cached per tabId in a `Map` so switching tabs preserves scrollback.
 - **Preload security**: All renderer-to-main communication goes through `contextBridge`. No `nodeIntegration`, strict `contextIsolation`, `sandbox: true`.
 

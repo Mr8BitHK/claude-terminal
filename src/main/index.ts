@@ -1,4 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron';
+import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
@@ -10,6 +13,7 @@ import { HookInstaller } from './hook-installer';
 import { SettingsStore } from './settings-store';
 import { PIPE_NAME, PERMISSION_FLAGS, IpcMessage } from '@shared/types';
 import type { PermissionMode } from '@shared/types';
+import { log } from './logger';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -89,6 +93,8 @@ const createWindow = () => {
     });
   }
 
+  mainWindow.webContents.on('did-finish-load', () => log.attach(mainWindow!));
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -125,10 +131,58 @@ function notifyTabActivity(tabId: string, title: string, body: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: clean up naming flag file for a tab
+// ---------------------------------------------------------------------------
+function cleanupNamingFlag(tabId: string) {
+  const flagFile = path.join(os.tmpdir(), `claude-terminal-named-${tabId}`);
+  fs.unlink(flagFile, () => {}); // best-effort, ignore errors
+}
+
+// ---------------------------------------------------------------------------
+// Helper: generate a smart tab name using Claude Haiku
+// ---------------------------------------------------------------------------
+function generateTabName(tabId: string, prompt: string) {
+  log.debug('[generateTabName] starting for tab', tabId, 'prompt:', prompt.substring(0, 80));
+  const namePrompt = `Generate a short tab title (3-5 words) for a coding conversation that starts with this message. Reply with ONLY the title, no quotes, no punctuation:\n\n${prompt}`;
+
+  const isWindows = process.platform === 'win32';
+  const cmd = isWindows ? 'cmd.exe' : 'claude';
+  const args = isWindows
+    ? ['/c', 'claude', '-p', '--model', 'claude-haiku-4-5-20251001']
+    : ['-p', '--model', 'claude-haiku-4-5-20251001'];
+
+  log.debug('[generateTabName] spawning:', cmd, args.join(' '));
+  const child = execFile(cmd, args, { timeout: 30000 }, (err, stdout, stderr) => {
+    if (err) {
+      log.error('[generateTabName] FAILED:', err.message);
+      log.error('[generateTabName] stderr:', stderr);
+      return;
+    }
+    log.debug('[generateTabName] stdout:', JSON.stringify(stdout));
+
+    const name = stdout.trim().replace(/^["']|["']$/g, '').substring(0, 50);
+    if (!name) return;
+
+    const tab = tabManager.getTab(tabId);
+    if (!tab) return;
+
+    tabManager.rename(tabId, name);
+    const updated = tabManager.getTab(tabId);
+    if (updated) {
+      sendToRenderer('tab:updated', updated);
+    }
+  });
+
+  child.stdin?.write(namePrompt);
+  child.stdin?.end();
+}
+
+// ---------------------------------------------------------------------------
 // Hook message handling (from named-pipe IPC server)
 // ---------------------------------------------------------------------------
 function handleHookMessage(msg: IpcMessage) {
   const { tabId, event, data } = msg;
+  log.debug('[hook]', event, tabId, data ? data.substring(0, 80) : null);
   const tab = tabManager.getTab(tabId);
   if (!tab && event !== 'tab:closed') return;
 
@@ -161,6 +215,7 @@ function handleHookMessage(msg: IpcMessage) {
       break;
 
     case 'tab:closed':
+      cleanupNamingFlag(tabId);
       tabManager.removeTab(tabId);
       ptyManager.kill(tabId);
       sendToRenderer('tab:removed', tabId);
@@ -171,6 +226,12 @@ function handleHookMessage(msg: IpcMessage) {
         tabManager.rename(tabId, data);
       }
       break;
+
+    case 'tab:generate-name':
+      if (data) {
+        generateTabName(tabId, data);
+      }
+      return; // don't broadcast tab:updated yet — the async call will do it
 
     default:
       return;
@@ -196,8 +257,15 @@ function registerIpcHandlers() {
       settings.addRecentDir(dir);
       settings.setPermissionMode(mode);
       worktreeManager = new WorktreeManager(dir);
-      const hooksDir = path.join(app.getAppPath(), 'src', 'hooks');
-      hookInstaller = new HookInstaller(hooksDir);
+      // In dev, __dirname is .vite/build/ — go up to project root.
+      // In production, hooks are copied to resources/hooks/ by forge config.
+      const projectRoot = app.isPackaged
+        ? path.join(process.resourcesPath, 'hooks')
+        : path.join(__dirname, '..', '..', 'src', 'hooks');
+      log.debug('[session:start] __dirname:', __dirname);
+      log.debug('[session:start] hooksDir:', projectRoot);
+      log.debug('[session:start] hooks exist:', fs.existsSync(path.join(projectRoot, 'pipe-send.js')));
+      hookInstaller = new HookInstaller(projectRoot);
     },
   );
 
@@ -214,7 +282,7 @@ function registerIpcHandlers() {
 
     // Install hooks so Claude Code can communicate back to us.
     if (hookInstaller) {
-      hookInstaller.install(cwd, tab.id);
+      hookInstaller.install(cwd);
     }
 
     // Build claude CLI arguments.
@@ -227,6 +295,7 @@ function registerIpcHandlers() {
     const extraEnv: Record<string, string> = {
       CLAUDE_TERMINAL_TAB_ID: tab.id,
       CLAUDE_TERMINAL_PIPE: PIPE_NAME,
+      CLAUDE_TERMINAL_TMPDIR: os.tmpdir(),
     };
 
     // Spawn the Claude PTY.
@@ -240,6 +309,7 @@ function registerIpcHandlers() {
 
     // When the PTY exits, clean up.
     proc.onExit(() => {
+      cleanupNamingFlag(tab.id);
       tabManager.removeTab(tab.id);
       sendToRenderer('tab:removed', tab.id);
     });
@@ -255,6 +325,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('tab:close', async (_event, tabId: string) => {
     ptyManager.kill(tabId);
+    cleanupNamingFlag(tabId);
     const tab = tabManager.getTab(tabId);
     if (tab?.worktree && worktreeManager) {
       try {
@@ -345,8 +416,9 @@ app.on('ready', async () => {
   // Start the named-pipe IPC server for hook communication.
   try {
     await ipcServer.start();
+    log.info('[ipc-server] listening on pipe');
   } catch (err) {
-    console.error('Failed to start IPC server:', err);
+    log.error('[ipc-server] FAILED to start:', String(err));
   }
 
   ipcServer.onMessage(handleHookMessage);
@@ -369,6 +441,11 @@ app.on('window-all-closed', async () => {
     if (savedTabs.length > 0) {
       settings.saveSessions(workspaceDir, savedTabs);
     }
+  }
+
+  // Clean up all naming flag files
+  for (const tab of tabManager.getAllTabs()) {
+    cleanupNamingFlag(tab.id);
   }
 
   ptyManager.killAll();
