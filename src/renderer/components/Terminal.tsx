@@ -26,15 +26,7 @@ function ensurePtyListener(): void {
     win.__cleanupPtyListener();
   }
 
-  // DEBUG: count write calls to detect duplicate listeners
-  const win2 = window as any;
-  win2.__ptyWriteCount = (win2.__ptyWriteCount || 0);
-
   win.__cleanupPtyListener = window.claudeTerminal.onPtyData((dataTabId, data) => {
-    win2.__ptyWriteCount++;
-    if (win2.__ptyWriteCount <= 20 || win2.__ptyWriteCount % 100 === 0) {
-      console.log(`[PTY] write #${win2.__ptyWriteCount} tab=${dataTabId} len=${data.length}`);
-    }
     const cached = terminalCache.get(dataTabId);
     if (cached) {
       cached.term.write(data);
@@ -111,10 +103,7 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
 
     // Helper: fit terminal and sync PTY dimensions
     const fitAndSync = () => {
-      const prevCols = term.cols;
-      const prevRows = term.rows;
       fitAddon.fit();
-      console.log(`[FIT] tab=${tabId} ${prevCols}x${prevRows} -> ${term.cols}x${term.rows}`);
       if (term.cols > 0 && term.rows > 0) {
         window.claudeTerminal.resizePty(tabId, term.cols, term.rows);
       }
@@ -124,10 +113,7 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
     const alreadyAttached =
       attachedRef.current === tabId && container.querySelector('.xterm');
 
-    console.log(`[TERM] effect run tab=${tabId} isVisible=${isVisible} alreadyAttached=${alreadyAttached}`);
-
     if (!alreadyAttached) {
-      console.log(`[TERM] OPENING terminal tab=${tabId}`);
       // Clear container and attach
       container.innerHTML = '';
       term.open(container);
@@ -153,9 +139,7 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
 
     // Handle resize — always set up observer (even for already-attached terminals)
     let resizeTimeout: ReturnType<typeof setTimeout>;
-    const resizeObserver = new ResizeObserver((entries) => {
-      const r = entries[0]?.contentRect;
-      console.log(`[RESIZE] tab=${tabId} ${r?.width}x${r?.height}`);
+    const resizeObserver = new ResizeObserver(() => {
       // Debounce rapid resize events to avoid flooding the PTY
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(fitAndSync, 50);
