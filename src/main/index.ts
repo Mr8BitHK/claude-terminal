@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification } from 'electron';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -57,6 +57,8 @@ const cliStartDir = parseCliStartDir();
 // Window creation
 // ---------------------------------------------------------------------------
 const createWindow = () => {
+  Menu.setApplicationMenu(null);
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
