@@ -135,6 +135,7 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
     // Defer initial fit to next frame so the container has final layout dimensions
     const rafId = requestAnimationFrame(() => {
       fitAndSync();
+      term.focus();
     });
 
     // Handle resize — always set up observer (even for already-attached terminals)
