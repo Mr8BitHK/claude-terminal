@@ -83,17 +83,15 @@ const createWindow = () => {
 
   // Set title after page loads so it doesn't get overwritten by the HTML <title>.
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.setTitle(`ClaudeTerminal - ${workingDir}`);
+    mainWindow!.setTitle(`ClaudeTerminal - ${workingDir}`);
   });
 
-  // Open DevTools in development with Ctrl+Shift+I.
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.on('before-input-event', (_event, input) => {
-      if (input.control && input.shift && input.key === 'I') {
-        mainWindow!.webContents.toggleDevTools();
-      }
-    });
-  }
+  // Open DevTools with Ctrl+Shift+I.
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.control && input.shift && input.key === 'I') {
+      mainWindow!.webContents.toggleDevTools();
+    }
+  });
 
   mainWindow.webContents.on('did-finish-load', () => log.attach(mainWindow!));
 

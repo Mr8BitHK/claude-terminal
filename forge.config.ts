@@ -30,11 +30,19 @@ const config: ForgeConfig = {
         const rendererSrc = path.join(__dirname, 'src', 'renderer', '.vite', 'renderer');
         const rendererDest = path.join(buildPath, '.vite', 'renderer');
 
+        // 3. Copy hook scripts so the packaged app can find them at
+        //    process.resourcesPath/hooks/.
+        const hooksSrc = path.join(__dirname, 'src', 'hooks');
+        const hooksDest = path.join(buildPath, '..', 'hooks');
+
         fs.cp(ptySrc, ptyDest, { recursive: true }, (err) => {
           if (err) return callback(err);
           fs.cp(rendererSrc, rendererDest, { recursive: true }, (err2) => {
             if (err2) return callback(err2);
-            callback();
+            fs.cp(hooksSrc, hooksDest, { recursive: true }, (err3) => {
+              if (err3) return callback(err3);
+              callback();
+            });
           });
         });
       },
@@ -46,7 +54,14 @@ const config: ForgeConfig = {
     ignoreModules: ['node-pty'],
   },
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      name: 'ClaudeTerminal',
+      exe: 'ClaudeTerminal.exe',
+      setupExe: 'ClaudeTerminalSetup.exe',
+      description: 'A Windows Terminal-like app for managing multiple Claude Code instances in tabs',
+      authors: 'Yaron Guan Golan',
+      noMsi: true,
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),

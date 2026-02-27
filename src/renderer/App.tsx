@@ -17,6 +17,44 @@ export default function App() {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
+  // Auto-start when a CLI directory was provided (skip StartupDialog)
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const cliDir = await window.claudeTerminal.getCliStartDir();
+      if (!cliDir || cancelled) return;
+
+      const savedMode = await window.claudeTerminal.getPermissionMode();
+      if (cancelled) return;
+
+      await window.claudeTerminal.startSession(cliDir, savedMode);
+      if (cancelled) return;
+
+      const savedTabs = await window.claudeTerminal.getSavedTabs(cliDir);
+      if (savedTabs.length > 0) {
+        for (const saved of savedTabs) {
+          const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId);
+          setActiveTabId(tab.id);
+        }
+      }
+
+      const allTabs = await window.claudeTerminal.getTabs();
+      const activeId = await window.claudeTerminal.getActiveTabId();
+      if (cancelled) return;
+
+      setTabs(allTabs);
+      setActiveTabId(activeId);
+      setAppState('running');
+
+      if (allTabs.length === 0) {
+        setShowNewTabDialog(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
   // Listen for tab updates from main process (registered once)
   useEffect(() => {
     const cleanupUpdate = window.claudeTerminal.onTabUpdate((tab) => {
