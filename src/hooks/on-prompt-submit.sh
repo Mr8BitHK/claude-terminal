@@ -4,7 +4,8 @@ PIPE_NAME="$2"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Only name the tab on the first prompt
-FLAG_FILE="/tmp/claude-terminal-named-${TAB_ID}"
+TMPDIR="${CLAUDE_TERMINAL_TMPDIR:-/tmp}"
+FLAG_FILE="${TMPDIR}/claude-terminal-named-${TAB_ID}"
 if [ -f "$FLAG_FILE" ]; then
   exit 0
 fi

@@ -5,21 +5,17 @@
 TAB_ID="$1"
 PIPE_NAME="$2"
 EVENT="$3"
-DATA="${4:-null}"
+DATA="${4:-}"
 
-if [ "$DATA" != "null" ]; then
-  DATA="\"$(echo "$DATA" | sed 's/"/\\\\"/g')\""
-fi
-
-MSG="{\"tabId\":\"${TAB_ID}\",\"event\":\"${EVENT}\",\"data\":${DATA}}"
-
-# Write to named pipe using Node.js (portable across Windows/WSL)
-# Pass pipe name and message via env vars to avoid backslash escaping issues
-PIPE_MSG="$MSG" PIPE_PATH="$PIPE_NAME" node -e "
+# Build and send JSON via Node.js (handles escaping and pipe transport)
+PIPE_TAB_ID="$TAB_ID" PIPE_EVENT="$EVENT" PIPE_DATA="$DATA" PIPE_PATH="$PIPE_NAME" node -e "
   const net = require('net');
-  const pipePath = process.env.PIPE_PATH;
-  const msg = process.env.PIPE_MSG;
-  const client = net.createConnection(pipePath, () => {
+  const msg = JSON.stringify({
+    tabId: process.env.PIPE_TAB_ID,
+    event: process.env.PIPE_EVENT,
+    data: process.env.PIPE_DATA || null
+  });
+  const client = net.createConnection(process.env.PIPE_PATH, () => {
     client.end(msg + '\n');
   });
   client.on('close', () => process.exit(0));

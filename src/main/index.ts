@@ -263,6 +263,7 @@ function registerIpcHandlers() {
     const extraEnv: Record<string, string> = {
       CLAUDE_TERMINAL_TAB_ID: tab.id,
       CLAUDE_TERMINAL_PIPE: PIPE_NAME,
+      CLAUDE_TERMINAL_TMPDIR: os.tmpdir(),
     };
 
     // Spawn the Claude PTY.
