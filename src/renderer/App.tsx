@@ -63,8 +63,8 @@ export default function App() {
         return;
       }
 
-      // Ctrl+W: close tab
-      if (e.ctrlKey && e.key === 'w') {
+      // Ctrl+F4: close tab
+      if (e.ctrlKey && e.key === 'F4') {
         e.preventDefault();
         if (activeTabId) {
           handleCloseTab(activeTabId);

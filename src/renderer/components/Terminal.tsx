@@ -71,7 +71,7 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
 
       // Let app-level shortcuts pass through to the window handler
       term.attachCustomKeyEventHandler((e) => {
-        if (e.ctrlKey && (e.key === 'w' || e.key === 't' || e.key === 'Tab'))
+        if (e.ctrlKey && (e.key === 'F4' || e.key === 't' || e.key === 'Tab'))
           return false;
         if (e.ctrlKey && e.key >= '1' && e.key <= '9') return false;
         if (e.key === 'F2') return false;

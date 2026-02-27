@@ -23,7 +23,7 @@ export default function StatusBar({ tab, tabCount }: StatusBarProps) {
         <span>No active tab</span>
       )}
       <span className="status-help">
-        Ctrl+T new | Ctrl+W close | Ctrl+Tab switch | F2 rename
+        Ctrl+T new | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
       </span>
     </div>
   );
