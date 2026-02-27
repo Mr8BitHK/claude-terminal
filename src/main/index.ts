@@ -73,9 +73,13 @@ const createWindow = () => {
     );
   }
 
-  // Open DevTools in development.
+  // Open DevTools in development with Ctrl+Shift+I.
   if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+      if (input.control && input.shift && input.key === 'I') {
+        mainWindow!.webContents.toggleDevTools();
+      }
+    });
   }
 
   mainWindow.on('closed', () => {
