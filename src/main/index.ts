@@ -70,8 +70,6 @@ const createWindow = () => {
     },
   });
 
-  const workingDir = path.resolve(cliStartDir || process.cwd());
-
   // Load the renderer from the Vite dev server or production bundle.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -82,8 +80,12 @@ const createWindow = () => {
   }
 
   // Set title after page loads so it doesn't get overwritten by the HTML <title>.
+  // The actual working directory title is set in session:start once the user picks a dir.
+  const initialTitle = cliStartDir
+    ? `ClaudeTerminal - ${path.resolve(cliStartDir)}`
+    : 'ClaudeTerminal';
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow!.setTitle(`ClaudeTerminal - ${workingDir}`);
+    mainWindow!.setTitle(initialTitle);
   });
 
   // Open DevTools with Ctrl+Shift+I.
@@ -148,8 +150,8 @@ function generateTabName(tabId: string, prompt: string) {
   const isWindows = process.platform === 'win32';
   const cmd = isWindows ? 'cmd.exe' : 'claude';
   const args = isWindows
-    ? ['/c', 'claude', '-p', '--model', 'claude-haiku-4-5-20251001']
-    : ['-p', '--model', 'claude-haiku-4-5-20251001'];
+    ? ['/c', 'claude', '-p', '--no-session-persistence', '--model', 'claude-haiku-4-5-20251001']
+    : ['-p', '--no-session-persistence', '--model', 'claude-haiku-4-5-20251001'];
 
   log.debug('[generateTabName] spawning:', cmd, args.join(' '));
   const child = execFile(cmd, args, { timeout: 30000 }, (err, stdout, stderr) => {
@@ -279,6 +281,9 @@ function registerIpcHandlers() {
     async (_event, dir: string, mode: PermissionMode) => {
       workspaceDir = dir;
       permissionMode = mode;
+      if (mainWindow) {
+        mainWindow.setTitle(`ClaudeTerminal - ${dir}`);
+      }
       settings.addRecentDir(dir);
       settings.setPermissionMode(mode);
       worktreeManager = new WorktreeManager(dir);
