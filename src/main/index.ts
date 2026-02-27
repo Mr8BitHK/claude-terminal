@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import started from 'electron-squirrel-startup';
+import { handleSquirrelEvent } from './squirrel-startup';
 
 import { TabManager } from './tab-manager';
 import { PtyManager } from './pty-manager';
@@ -16,8 +16,8 @@ import type { PermissionMode } from '@shared/types';
 import { log } from './logger';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-  app.quit();
+if (handleSquirrelEvent(app)) {
+  process.exit(0);
 }
 
 // ---------------------------------------------------------------------------
