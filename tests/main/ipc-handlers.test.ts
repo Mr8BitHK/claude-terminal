@@ -34,6 +34,7 @@ vi.mock('@main/worktree-manager', () => ({
       getCurrentBranch: vi.fn(),
       listDetails: vi.fn(),
       remove: vi.fn(),
+      checkStatus: vi.fn(() => ({ clean: true, changesCount: 0 })),
     };
   }),
 }));
@@ -97,6 +98,9 @@ function makeMockDeps(): IpcHandlerDeps {
     sendToRenderer: vi.fn(),
     persistSessions: vi.fn(),
     cleanupNamingFlag: vi.fn(),
+    activateRemoteAccess: vi.fn(async () => ({ status: 'connecting' as const, tunnelUrl: null, token: 'test-token', error: null })),
+    deactivateRemoteAccess: vi.fn(async () => {}),
+    getRemoteAccessInfo: vi.fn(() => ({ status: 'inactive' as const, tunnelUrl: null, token: null, error: null })),
   };
 }
 
@@ -115,9 +119,10 @@ describe('registerIpcHandlers', () => {
     const expectedHandlers = [
       'session:start', 'session:getSavedTabs',
       'tab:create', 'tab:createShell', 'tab:close', 'tab:switch', 'tab:rename', 'tab:getAll', 'tab:getActiveId',
-      'worktree:create', 'worktree:currentBranch', 'worktree:listDetails', 'worktree:remove',
+      'worktree:create', 'worktree:currentBranch', 'worktree:listDetails', 'worktree:remove', 'worktree:checkStatus',
       'settings:recentDirs', 'settings:removeRecentDir', 'settings:permissionMode',
       'dialog:selectDirectory', 'cli:getStartDir',
+      'remote:activate', 'remote:deactivate', 'remote:getInfo',
     ];
     for (const channel of expectedHandlers) {
       expect(handlers.has(channel), `missing handler: ${channel}`).toBe(true);
@@ -125,6 +130,8 @@ describe('registerIpcHandlers', () => {
 
     expect(listeners.has('pty:write')).toBe(true);
     expect(listeners.has('pty:resize')).toBe(true);
+    expect(listeners.has('pty:pause')).toBe(true);
+    expect(listeners.has('pty:resume')).toBe(true);
     expect(listeners.has('window:setTitle')).toBe(true);
   });
 
@@ -143,6 +150,35 @@ describe('registerIpcHandlers', () => {
 
     expect(deps.ptyManager.kill).toHaveBeenCalledWith('tab-1');
     expect(deps.cleanupNamingFlag).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('tab:close with removeWorktree=true removes the worktree', async () => {
+    // Set up a worktree tab
+    deps.state.workspaceDir = '/test';
+    const startHandler = handlers.get('session:start')!;
+    await startHandler({}, '/test', 'bypassPermissions');
+    (deps.tabManager.getTab as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'wt-1', worktree: 'my-feature', cwd: '/test/.claude/worktrees/my-feature',
+    });
+
+    const handler = handlers.get('tab:close')!;
+    await handler({}, 'wt-1', true);
+
+    expect(deps.state.worktreeManager!.remove).toHaveBeenCalledWith('/test/.claude/worktrees/my-feature');
+  });
+
+  it('tab:close without removeWorktree does not remove the worktree', async () => {
+    deps.state.workspaceDir = '/test';
+    const startHandler = handlers.get('session:start')!;
+    await startHandler({}, '/test', 'bypassPermissions');
+    (deps.tabManager.getTab as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'wt-1', worktree: 'my-feature', cwd: '/test/.claude/worktrees/my-feature',
+    });
+
+    const handler = handlers.get('tab:close')!;
+    await handler({}, 'wt-1');
+
+    expect(deps.state.worktreeManager!.remove).not.toHaveBeenCalled();
   });
 
   it('tab:switch delegates to tabManager', async () => {
@@ -181,5 +217,42 @@ describe('registerIpcHandlers', () => {
     const result = await handler({});
 
     expect(result).toBe('/some/path');
+  });
+
+  it('registers pty:pause and pty:resume listeners', () => {
+    expect(listeners.has('pty:pause')).toBe(true);
+    expect(listeners.has('pty:resume')).toBe(true);
+  });
+
+  describe('pty flow control', () => {
+    it('buffers data when paused and flushes on resume', async () => {
+      // Start session and create tab to set up PTY data forwarding
+      deps.state.workspaceDir = '/test';
+      const handler = handlers.get('tab:create')!;
+      await handler({}, null);
+
+      // Get the onData callback that was registered on the mock PTY
+      const mockProc = (deps.ptyManager.spawn as ReturnType<typeof vi.fn>).mock.results[0].value;
+      const onDataCallback = mockProc.onData.mock.calls[0][0];
+
+      // Pause the tab
+      const pauseListener = listeners.get('pty:pause')!;
+      pauseListener({}, 'tab-1');
+
+      // Send data while paused — should NOT reach renderer
+      (deps.sendToRenderer as ReturnType<typeof vi.fn>).mockClear();
+      onDataCallback('buffered data');
+      expect(deps.sendToRenderer).not.toHaveBeenCalledWith('pty:data', 'tab-1', 'buffered data');
+
+      // Resume — should flush buffered data
+      const resumeListener = listeners.get('pty:resume')!;
+      resumeListener({}, 'tab-1');
+      expect(deps.sendToRenderer).toHaveBeenCalledWith('pty:data', 'tab-1', 'buffered data');
+
+      // After resume, new data should flow directly
+      (deps.sendToRenderer as ReturnType<typeof vi.fn>).mockClear();
+      onDataCallback('live data');
+      expect(deps.sendToRenderer).toHaveBeenCalledWith('pty:data', 'tab-1', 'live data');
+    });
   });
 });

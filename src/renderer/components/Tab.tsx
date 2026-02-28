@@ -6,14 +6,20 @@ import TabIndicator from './TabIndicator';
 
 interface TabProps {
   tab: TabType;
+  index: number;
   isActive: boolean;
   onClick: () => void;
   onClose: () => void;
   onRename: (name: string) => void;
   onOpenShell?: (shellType: 'powershell' | 'wsl') => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  onDrop: (e: React.DragEvent) => void;
+  isDragOver: boolean;
 }
 
-export default function Tab({ tab, isActive, onClick, onClose, onRename, onOpenShell }: TabProps) {
+export default function Tab({ tab, index, isActive, onClick, onClose, onRename, onOpenShell, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver }: TabProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(tab.name);
   const [showChevron, setShowChevron] = useState(false);
@@ -95,9 +101,14 @@ export default function Tab({ tab, isActive, onClick, onClose, onRename, onOpenS
   return (
     <div
       ref={tabRef}
-      className={`tab ${isActive ? 'tab-active' : ''} ${statusClass} ${shellClass}`}
+      className={`tab ${isActive ? 'tab-active' : ''} ${statusClass} ${shellClass}${isDragOver ? ' tab-drag-over' : ''}`}
       onClick={onClick}
       onDoubleClick={handleDoubleClick}
+      draggable={!isRenaming}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onDrop={onDrop}
     >
       {tab.type === 'claude' ? (
         <TabIndicator status={tab.status} />
@@ -110,21 +121,23 @@ export default function Tab({ tab, isActive, onClick, onClose, onRename, onOpenS
           )}
         </span>
       )}
-      {isRenaming ? (
-        <input
-          ref={inputRef}
-          className="tab-rename-input"
-          value={renameValue}
-          onChange={(e) => setRenameValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={commitRename}
-        />
-      ) : (
-        <span className="tab-name">{tab.name}</span>
-      )}
-      {tab.worktree && (
-        <span className="tab-worktree">[{tab.worktree}]</span>
-      )}
+      <div className="tab-labels">
+        {isRenaming ? (
+          <input
+            ref={inputRef}
+            className="tab-rename-input"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={commitRename}
+          />
+        ) : (
+          <span className="tab-name">{index < 9 && <span className="tab-number">{index + 1}</span>}{tab.name}</span>
+        )}
+        {tab.worktree && (
+          <span className="tab-worktree">{tab.worktree}</span>
+        )}
+      </div>
       {tab.type === 'claude' && onOpenShell && (
         <div className="tab-chevron-wrapper" ref={chevronRef}>
           <button className="tab-chevron" onClick={handleChevronClick} title="Open shell here">&#9662;</button>

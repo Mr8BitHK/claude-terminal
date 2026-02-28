@@ -1,14 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
-import { terminalCache } from './terminalCache';
+import { terminalCache, pendingBytes, pausedTabs } from './terminalCache';
 
 interface TerminalProps {
   tabId: string;
   isVisible: boolean;
+  /** When set, terminal uses fixed dimensions instead of FitAddon. */
+  fixedCols?: number;
+  fixedRows?: number;
 }
+
+const HIGH_WATERMARK = 50 * 1024; // 50KB
+const LOW_WATERMARK = 10 * 1024;  // 10KB
 
 // Single global PTY data listener (registered once, not per component).
 // We store the cleanup handle on `window` so it survives Vite HMR module
@@ -28,13 +35,29 @@ function ensurePtyListener(): void {
 
   win.__cleanupPtyListener = window.claudeTerminal.onPtyData((dataTabId, data) => {
     const cached = terminalCache.get(dataTabId);
-    if (cached) {
-      cached.term.write(data);
+    if (!cached) return;
+
+    const pending = (pendingBytes.get(dataTabId) ?? 0) + data.length;
+    pendingBytes.set(dataTabId, pending);
+
+    cached.term.write(data, () => {
+      const updated = (pendingBytes.get(dataTabId) ?? 0) - data.length;
+      pendingBytes.set(dataTabId, Math.max(0, updated));
+
+      if (pausedTabs.has(dataTabId) && updated < LOW_WATERMARK) {
+        pausedTabs.delete(dataTabId);
+        window.claudeTerminal.resumePty(dataTabId);
+      }
+    });
+
+    if (!pausedTabs.has(dataTabId) && pending > HIGH_WATERMARK) {
+      pausedTabs.add(dataTabId);
+      window.claudeTerminal.pausePty(dataTabId);
     }
   });
 }
 
-export default function Terminal({ tabId, isVisible }: TerminalProps) {
+export default function Terminal({ tabId, isVisible, fixedCols, fixedRows }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const attachedRef = useRef<string | null>(null);
 
@@ -50,6 +73,7 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
         cursorBlink: true,
         fontSize: 14,
         fontFamily: "'Cascadia Code', 'Consolas', monospace",
+        scrollback: 5000,
         theme: {
           background: '#1e1e1e',
           foreground: '#d4d4d4',
@@ -75,7 +99,9 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
       });
 
       const fitAddon = new FitAddon();
+      const serializeAddon = new SerializeAddon();
       term.loadAddon(fitAddon);
+      term.loadAddon(serializeAddon);
       term.loadAddon(new WebLinksAddon());
 
       // Let app-level shortcuts pass through to the window handler
@@ -96,11 +122,11 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
       });
 
       // Forward keyboard input to PTY
-      term.onData((data) => {
+      const onDataDisposable = term.onData((data) => {
         window.claudeTerminal.writeToPty(tabId, data);
       });
 
-      cached = { term, fitAddon };
+      cached = { term, fitAddon, serializeAddon, onDataDisposable };
       terminalCache.set(tabId, cached);
     }
 
@@ -109,11 +135,18 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
     // Ensure the global PTY data listener is registered
     ensurePtyListener();
 
+    const isFixedSize = fixedCols !== undefined && fixedRows !== undefined;
+
     // Helper: fit terminal and sync PTY dimensions
     const fitAndSync = () => {
-      fitAddon.fit();
-      if (term.cols > 0 && term.rows > 0) {
-        window.claudeTerminal.resizePty(tabId, term.cols, term.rows);
+      if (isFixedSize) {
+        // Remote mode: use exact host terminal dimensions
+        term.resize(fixedCols, fixedRows);
+      } else {
+        fitAddon.fit();
+        if (term.cols > 0 && term.rows > 0) {
+          window.claudeTerminal.resizePty(tabId, term.cols, term.rows);
+        }
       }
     };
 
@@ -152,21 +185,30 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
       term.focus();
     });
 
-    // Handle resize — always set up observer (even for already-attached terminals)
+    // Handle resize — for Electron, observe container; for remote, size is driven by props
     let resizeTimeout: ReturnType<typeof setTimeout>;
-    const resizeObserver = new ResizeObserver(() => {
-      // Debounce rapid resize events to avoid flooding the PTY
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(fitAndSync, 50);
-    });
-    resizeObserver.observe(container);
+    let resizeObserver: ResizeObserver | null = null;
+    if (!isFixedSize) {
+      resizeObserver = new ResizeObserver(() => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(fitAndSync, 50);
+      });
+      resizeObserver.observe(container);
+    }
 
     return () => {
       cancelAnimationFrame(rafId);
       clearTimeout(resizeTimeout);
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
       container.removeEventListener('contextmenu', handleContextMenu);
     };
+  }, [tabId, isVisible, fixedCols, fixedRows]);
+
+  // Toggle cursor blink off for hidden terminals to stop idle GPU repaints
+  useEffect(() => {
+    const cached = terminalCache.get(tabId);
+    if (!cached) return;
+    cached.term.options.cursorBlink = isVisible;
   }, [tabId, isVisible]);
 
   return (

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Tab as TabType } from '../../shared/types';
+import type { Tab as TabType, RemoteAccessInfo } from '../../shared/types';
 import Tab from './Tab';
 import HamburgerMenu from './HamburgerMenu';
+import RemoteAccessButton from './RemoteAccessButton';
 
 interface TabBarProps {
   tabs: TabType[];
@@ -12,8 +13,12 @@ interface TabBarProps {
   onNewClaudeTab: () => void;
   onNewWorktreeTab: () => void;
   onNewShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string) => void;
+  onReorderTabs: (tabs: TabType[]) => void;
   worktreeCount: number;
   onManageWorktrees: () => void;
+  remoteInfo: RemoteAccessInfo;
+  onActivateRemote: () => void;
+  onDeactivateRemote: () => void;
 }
 
 export default function TabBar({
@@ -25,11 +30,18 @@ export default function TabBar({
   onNewClaudeTab,
   onNewWorktreeTab,
   onNewShellTab,
+  onReorderTabs,
   worktreeCount,
   onManageWorktrees,
+  remoteInfo,
+  onActivateRemote,
+  onDeactivateRemote,
 }: TabBarProps) {
   const [showNewTabMenu, setShowNewTabMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dragTabId = useRef<string | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (!showNewTabMenu) return;
@@ -43,16 +55,50 @@ export default function TabBar({
   }, [showNewTabMenu]);
 
   return (
-    <div className="tab-bar">
-      {tabs.map((tab) => (
+    <div className={`tab-bar${isDragging ? ' tab-bar-dragging' : ''}`}>
+      {tabs.map((tab, index) => (
         <Tab
           key={tab.id}
           tab={tab}
+          index={index}
           isActive={tab.id === activeTabId}
           onClick={() => onSelectTab(tab.id)}
           onClose={() => onCloseTab(tab.id)}
           onRename={(name) => onRenameTab(tab.id, name)}
           onOpenShell={(shellType) => onNewShellTab(shellType, tab.id)}
+          isDragOver={dragOverTabId === tab.id}
+          onDragStart={(e) => {
+            dragTabId.current = tab.id;
+            e.dataTransfer.effectAllowed = 'move';
+            setIsDragging(true);
+            document.body.classList.add('tab-dragging');
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (dragTabId.current && dragTabId.current !== tab.id) {
+              setDragOverTabId(tab.id);
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverTabId(null);
+            const fromId = dragTabId.current;
+            if (!fromId || fromId === tab.id) return;
+            const fromIdx = tabs.findIndex((t) => t.id === fromId);
+            const toIdx = tabs.findIndex((t) => t.id === tab.id);
+            if (fromIdx < 0 || toIdx < 0) return;
+            const reordered = [...tabs];
+            const [moved] = reordered.splice(fromIdx, 1);
+            reordered.splice(toIdx, 0, moved);
+            onReorderTabs(reordered);
+          }}
+          onDragEnd={() => {
+            dragTabId.current = null;
+            setDragOverTabId(null);
+            setIsDragging(false);
+            document.body.classList.remove('tab-dragging');
+          }}
         />
       ))}
       <div className="new-tab-menu" ref={menuRef}>
@@ -98,6 +144,11 @@ export default function TabBar({
         )}
       </div>
       <HamburgerMenu worktreeCount={worktreeCount} onManageWorktrees={onManageWorktrees} />
+      <RemoteAccessButton
+        remoteInfo={remoteInfo}
+        onActivate={onActivateRemote}
+        onDeactivate={onDeactivateRemote}
+      />
     </div>
   );
 }

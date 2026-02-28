@@ -47,7 +47,9 @@ body {
 }
 .tab-indicator-pulse svg { animation: pulse 1.5s ease-in-out infinite; }
 
-.tab-worktree { font-size: 11px; color: #808080; margin-left: 4px; }
+.tab-labels { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.tab-number { color: #808080; margin-right: 4px; font-size: 11px; }
+.tab-worktree { font-size: 10px; color: #808080; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .tab-close {
   background: none; border: none; color: #808080;
@@ -55,6 +57,10 @@ body {
   -webkit-app-region: no-drag;
 }
 .tab-close:hover { color: #fff; }
+
+.tab-drag-over { border-left: 2px solid #007acc; }
+.tab-bar-dragging { -webkit-app-region: no-drag; }
+.tab-dragging .terminal-area { pointer-events: none; }
 
 .tab-rename-input {
   background: #3c3c3c; border: 1px solid #007acc;
@@ -94,6 +100,7 @@ body {
   border-radius: 8px; padding: 24px; min-width: 400px; max-width: 500px;
 }
 .dialog h1, .dialog h2 { color: #fff; margin-bottom: 16px; }
+.dialog-text { color: #d4d4d4; font-size: 14px; line-height: 1.5; margin: 0; }
 .dialog input:not([type="radio"]) {
   width: 100%; padding: 8px; margin-top: 8px;
   background: #3c3c3c; border: 1px solid #555;
@@ -107,6 +114,8 @@ body {
 }
 .dialog button:hover, .start-btn:hover { background: #1a8ad4; }
 .dialog button:disabled, .start-btn:disabled { opacity: 0.5; cursor: default; }
+.dialog-btn-danger { background: #f44747 !important; }
+.dialog-btn-danger:hover { background: #d73a3a !important; }
 
 .startup-dialog { max-width: 480px; padding: 32px 28px 24px; }
 .startup-header { text-align: center; margin-bottom: 28px; }
@@ -180,6 +189,59 @@ body {
 .hamburger-item:hover:not(:disabled) { background: #2a2d2e; }
 .hamburger-item:disabled { color: #555; cursor: default; }
 .hamburger-item-hint { margin-left: auto; font-size: 11px; color: #555; }
+
+/* Remote access button & dropdown */
+.remote-access-menu { position: relative; -webkit-app-region: no-drag; }
+
+.remote-access-btn {
+  background: none; border: none; color: #555;
+  cursor: pointer; padding: 4px 8px; display: flex; align-items: center;
+  transition: color 0.2s;
+}
+.remote-access-btn:hover { color: #808080; }
+.remote-access-btn.remote-active { color: #6a9955; }
+.remote-access-btn.remote-connecting { color: #dcdcaa; animation: pulse 1.5s infinite; }
+
+.remote-access-dropdown {
+  position: absolute; top: 100%; right: 0;
+  background: #252526; border: 1px solid #3c3c3c; border-radius: 8px;
+  min-width: 260px; padding: 12px; z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.remote-access-header { font-size: 13px; font-weight: 600; color: #d4d4d4; margin-bottom: 8px; }
+.remote-access-desc { font-size: 12px; color: #808080; margin: 0 0 12px 0; }
+.remote-access-status { font-size: 12px; color: #6a9955; margin-bottom: 8px; }
+.remote-access-error { font-size: 12px; color: #f44747; margin: 0 0 8px 0; }
+
+.remote-access-qr { text-align: center; margin-bottom: 8px; }
+.remote-access-qr img { border-radius: 4px; }
+
+.remote-access-field {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 6px; font-size: 12px;
+}
+.remote-access-label { color: #808080; min-width: 36px; }
+.remote-access-value {
+  flex: 1; color: #d4d4d4; background: #1e1e1e; padding: 2px 6px;
+  border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px;
+}
+.remote-access-copy {
+  background: none; border: 1px solid #3c3c3c; color: #808080;
+  font-size: 11px; padding: 2px 6px; border-radius: 3px; cursor: pointer;
+  white-space: nowrap;
+}
+.remote-access-copy:hover { color: #d4d4d4; border-color: #555; }
+
+.remote-access-action {
+  width: 100%; padding: 6px 12px; margin-top: 8px;
+  background: #007acc; border: none; color: #fff;
+  border-radius: 4px; font-size: 13px; cursor: pointer;
+}
+.remote-access-action:hover { background: #1a8ad4; }
+.remote-access-action.remote-deactivate { background: #3c3c3c; color: #d4d4d4; }
+.remote-access-action.remote-deactivate:hover { background: #4a4a4a; }
 
 /* Worktree manager dialog */
 .wt-dialog { min-width: 480px; max-width: 600px; }

@@ -5,6 +5,8 @@ import { getClaudeCommand } from '@shared/claude-cli';
 interface ManagedPty {
   process: pty.IPty;
   tabId: string;
+  cols: number;
+  rows: number;
 }
 
 export class PtyManager {
@@ -32,7 +34,7 @@ export class PtyManager {
       env,
     });
 
-    this.ptys.set(tabId, { process: proc, tabId });
+    this.ptys.set(tabId, { process: proc, tabId, cols: 120, rows: 40 });
     return proc;
   }
 
@@ -55,7 +57,7 @@ export class PtyManager {
       env,
     });
 
-    this.ptys.set(tabId, { process: proc, tabId });
+    this.ptys.set(tabId, { process: proc, tabId, cols: 120, rows: 40 });
     return proc;
   }
 
@@ -64,7 +66,17 @@ export class PtyManager {
   }
 
   resize(tabId: string, cols: number, rows: number): void {
-    this.ptys.get(tabId)?.process.resize(cols, rows);
+    const managed = this.ptys.get(tabId);
+    if (managed) {
+      managed.process.resize(cols, rows);
+      managed.cols = cols;
+      managed.rows = rows;
+    }
+  }
+
+  getSize(tabId: string): { cols: number; rows: number } | null {
+    const managed = this.ptys.get(tabId);
+    return managed ? { cols: managed.cols, rows: managed.rows } : null;
   }
 
   kill(tabId: string): void {

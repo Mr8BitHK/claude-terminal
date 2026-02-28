@@ -38,6 +38,19 @@ export class WorktreeManager {
     return worktreePath;
   }
 
+  checkStatus(worktreePath: string): { clean: boolean; changesCount: number } {
+    let statusOutput = '';
+    try {
+      statusOutput = String(
+        execSync('git status --porcelain', { cwd: worktreePath, encoding: 'utf-8' })
+      );
+    } catch {
+      // worktree may be in a broken state
+    }
+    const lines = statusOutput.trim().split('\n').filter(Boolean);
+    return { clean: lines.length === 0, changesCount: lines.length };
+  }
+
   remove(worktreePath: string): void {
     // Derive the branch name from the worktree directory name
     const branchName = path.basename(worktreePath);

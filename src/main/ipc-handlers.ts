@@ -2,7 +2,7 @@ import { app, dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { PermissionMode } from '@shared/types';
+import type { PermissionMode, RemoteAccessInfo } from '@shared/types';
 import { PERMISSION_FLAGS } from '@shared/types';
 import { WorktreeManager } from './worktree-manager';
 import { HookInstaller } from './hook-installer';
@@ -29,10 +29,16 @@ export interface IpcHandlerDeps {
   sendToRenderer: (channel: string, ...args: unknown[]) => void;
   persistSessions: () => void;
   cleanupNamingFlag: (tabId: string) => void;
+  activateRemoteAccess: () => Promise<RemoteAccessInfo>;
+  deactivateRemoteAccess: () => Promise<void>;
+  getRemoteAccessInfo: () => RemoteAccessInfo;
 }
 
 export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   const { tabManager, ptyManager, settings, state } = deps;
+
+  // Per-tab flow control state for PTY data buffering
+  const flowControl = new Map<string, { paused: boolean; buffer: string[] }>();
 
   // ---- Session ----
   ipcMain.handle(
@@ -91,11 +97,19 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
 
     settings.addRecentDir(state.workspaceDir);
 
+    flowControl.set(tab.id, { paused: false, buffer: [] });
+
     proc.onData((data: string) => {
-      deps.sendToRenderer('pty:data', tab.id, data);
+      const fc = flowControl.get(tab.id);
+      if (fc?.paused) {
+        fc.buffer.push(data);
+      } else {
+        deps.sendToRenderer('pty:data', tab.id, data);
+      }
     });
 
     proc.onExit(() => {
+      flowControl.delete(tab.id);
       if (tabManager.getTab(tab.id)) {
         deps.cleanupNamingFlag(tab.id);
         tabManager.removeTab(tab.id);
@@ -134,11 +148,19 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     const proc = ptyManager.spawnShell(tab.id, cwd, shellType);
     tab.pid = proc.pid;
 
+    flowControl.set(tab.id, { paused: false, buffer: [] });
+
     proc.onData((data: string) => {
-      deps.sendToRenderer('pty:data', tab.id, data);
+      const fc = flowControl.get(tab.id);
+      if (fc?.paused) {
+        fc.buffer.push(data);
+      } else {
+        deps.sendToRenderer('pty:data', tab.id, data);
+      }
     });
 
     proc.onExit(() => {
+      flowControl.delete(tab.id);
       if (tabManager.getTab(tab.id)) {
         tabManager.removeTab(tab.id);
         deps.sendToRenderer('tab:removed', tab.id);
@@ -152,15 +174,18 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     return tab;
   });
 
-  ipcMain.handle('tab:close', async (_event, tabId: string) => {
+  ipcMain.handle('tab:close', async (_event, tabId: string, removeWorktree?: boolean) => {
     ptyManager.kill(tabId);
+    flowControl.delete(tabId);
     deps.cleanupNamingFlag(tabId);
-    const tab = tabManager.getTab(tabId);
-    if (tab?.worktree && state.worktreeManager) {
-      try {
-        state.worktreeManager.remove(tab.cwd);
-      } catch {
-        // worktree removal is best-effort
+    if (removeWorktree) {
+      const tab = tabManager.getTab(tabId);
+      if (tab?.worktree && state.worktreeManager) {
+        try {
+          state.worktreeManager.remove(tab.cwd);
+        } catch {
+          // worktree removal is best-effort
+        }
       }
     }
     if (tabManager.getTab(tabId)) {
@@ -172,6 +197,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
 
   ipcMain.handle('tab:switch', async (_event, tabId: string) => {
     tabManager.setActiveTab(tabId);
+    // Notify remote web clients of the tab switch
+    deps.sendToRenderer('tab:switched', tabId);
   });
 
   ipcMain.handle(
@@ -194,6 +221,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     return tabManager.getActiveTabId();
   });
 
+  ipcMain.on('tab:reorder', (_event, tabIds: string[]) => {
+    tabManager.reorderTabs(tabIds);
+    deps.persistSessions();
+  });
+
   // ---- Worktree ----
   ipcMain.handle('worktree:create', async (_event, name: string) => {
     if (!state.worktreeManager) throw new Error('Session not started');
@@ -213,6 +245,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   ipcMain.handle('worktree:remove', async (_event, worktreePath: string) => {
     if (!state.worktreeManager) throw new Error('Session not started');
     state.worktreeManager.remove(worktreePath);
+  });
+
+  ipcMain.handle('worktree:checkStatus', async (_event, worktreePath: string) => {
+    if (!state.worktreeManager) throw new Error('Session not started');
+    return state.worktreeManager.checkStatus(worktreePath);
   });
 
   // ---- Settings ----
@@ -252,13 +289,44 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     'pty:resize',
     (_event, tabId: string, cols: number, rows: number) => {
       ptyManager.resize(tabId, cols, rows);
+      // Notify remote web clients so they can match the host terminal size
+      deps.sendToRenderer('pty:resized', tabId, cols, rows);
     },
   );
+
+  ipcMain.on('pty:pause', (_event, tabId: string) => {
+    const fc = flowControl.get(tabId);
+    if (fc) fc.paused = true;
+  });
+
+  ipcMain.on('pty:resume', (_event, tabId: string) => {
+    const fc = flowControl.get(tabId);
+    if (!fc) return;
+    fc.paused = false;
+    // Flush buffered data
+    for (const chunk of fc.buffer) {
+      deps.sendToRenderer('pty:data', tabId, chunk);
+    }
+    fc.buffer.length = 0;
+  });
 
   // ---- Window title (fire-and-forget) ----
   ipcMain.on('window:setTitle', (_event, title: string) => {
     if (state.mainWindow) {
       state.mainWindow.setTitle(title);
     }
+  });
+
+  // ---- Remote access ----
+  ipcMain.handle('remote:activate', async () => {
+    return deps.activateRemoteAccess();
+  });
+
+  ipcMain.handle('remote:deactivate', async () => {
+    return deps.deactivateRemoteAccess();
+  });
+
+  ipcMain.handle('remote:getInfo', async () => {
+    return deps.getRemoteAccessInfo();
   });
 }

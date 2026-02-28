@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { PermissionMode, Tab } from '../shared/types';
+import type { PermissionMode, Tab, RemoteAccessInfo } from '../shared/types';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
@@ -8,6 +8,7 @@ import StatusBar from './components/StatusBar';
 import { buildWindowTitle } from '../shared/window-title';
 import WorktreeNameDialog from './components/WorktreeNameDialog';
 import WorktreeManagerDialog from './components/WorktreeManagerDialog';
+import WorktreeCloseDialog from './components/WorktreeCloseDialog';
 
 type AppState = 'startup' | 'running';
 
@@ -19,6 +20,12 @@ export default function App() {
   const [showWorktreeManager, setShowWorktreeManager] = useState(false);
   const [worktreeCount, setWorktreeCount] = useState(0);
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
+  const [remoteInfo, setRemoteInfo] = useState<RemoteAccessInfo>({
+    status: 'inactive', tunnelUrl: null, token: null, error: null,
+  });
+  const [worktreeCloseConfirm, setWorktreeCloseConfirm] = useState<{
+    tabId: string; worktreeName: string; clean: boolean; changesCount: number;
+  } | null>(null);
 
   const handleSelectTab = useCallback(async (tabId: string) => {
     setActiveTabId(tabId);
@@ -26,8 +33,20 @@ export default function App() {
   }, []);
 
   const handleCloseTab = useCallback(async (tabId: string) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab?.worktree) {
+      try {
+        const status = await window.claudeTerminal.checkWorktreeStatus(tab.cwd);
+        setWorktreeCloseConfirm({
+          tabId, worktreeName: tab.worktree, clean: status.clean, changesCount: status.changesCount,
+        });
+        return;
+      } catch {
+        // If status check fails, close without removing worktree
+      }
+    }
     await window.claudeTerminal.closeTab(tabId);
-  }, []);
+  }, [tabs]);
 
   const handleRenameTab = useCallback(async (tabId: string, name: string) => {
     await window.claudeTerminal.renameTab(tabId, name);
@@ -41,6 +60,21 @@ export default function App() {
   const handleNewShellTab = useCallback(async (shellType: 'powershell' | 'wsl', afterTabId?: string) => {
     const tab = await window.claudeTerminal.createShellTab(shellType, afterTabId);
     setActiveTabId(tab.id);
+  }, []);
+
+  const handleReorderTabs = useCallback((reordered: Tab[]) => {
+    setTabs(reordered);
+    window.claudeTerminal.reorderTabs(reordered.map((t) => t.id));
+  }, []);
+
+  const handleActivateRemote = useCallback(async () => {
+    const info = await window.claudeTerminal.activateRemoteAccess();
+    setRemoteInfo(info);
+  }, []);
+
+  const handleDeactivateRemote = useCallback(async () => {
+    await window.claudeTerminal.deactivateRemoteAccess();
+    setRemoteInfo({ status: 'inactive', tunnelUrl: null, token: null, error: null });
   }, []);
 
   const handleNewTabWithWorktree = async (name: string) => {
@@ -119,9 +153,20 @@ export default function App() {
       });
     });
 
+    const cleanupRemote = window.claudeTerminal.onRemoteAccessUpdate((info) => {
+      setRemoteInfo(info);
+    });
+
+    // Remote client switched tabs — mirror locally
+    const cleanupSwitched = window.claudeTerminal.onTabSwitched((tabId) => {
+      setActiveTabId(tabId);
+    });
+
     return () => {
       cleanupUpdate();
       cleanupRemoved();
+      cleanupRemote();
+      cleanupSwitched();
     };
   }, []);
 
@@ -276,8 +321,12 @@ export default function App() {
         onNewClaudeTab={handleNewTabWithoutWorktree}
         onNewWorktreeTab={() => setShowWorktreeDialog(true)}
         onNewShellTab={handleNewShellTab}
+        onReorderTabs={handleReorderTabs}
         worktreeCount={worktreeCount}
         onManageWorktrees={() => setShowWorktreeManager(true)}
+        remoteInfo={remoteInfo}
+        onActivateRemote={handleActivateRemote}
+        onDeactivateRemote={handleDeactivateRemote}
       />
       <div className="terminal-area">
         {tabs.map((tab) => (
@@ -297,6 +346,19 @@ export default function App() {
       )}
       {showWorktreeManager && (
         <WorktreeManagerDialog onClose={() => setShowWorktreeManager(false)} />
+      )}
+      {worktreeCloseConfirm && (
+        <WorktreeCloseDialog
+          worktreeName={worktreeCloseConfirm.worktreeName}
+          clean={worktreeCloseConfirm.clean}
+          changesCount={worktreeCloseConfirm.changesCount}
+          onConfirm={async (removeWorktree) => {
+            const { tabId } = worktreeCloseConfirm;
+            setWorktreeCloseConfirm(null);
+            await window.claudeTerminal.closeTab(tabId, removeWorktree);
+          }}
+          onCancel={() => setWorktreeCloseConfirm(null)}
+        />
       )}
     </div>
   );

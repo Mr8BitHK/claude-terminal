@@ -10,6 +10,9 @@ import { SettingsStore } from './settings-store';
 import { createTabNamer } from './tab-namer';
 import { createHookRouter } from './hook-router';
 import { registerIpcHandlers, type AppState } from './ipc-handlers';
+import { TunnelManager } from './tunnel-manager';
+import { WebRemoteServer } from './web-remote-server';
+import type { RemoteAccessInfo } from '@shared/types';
 import { log } from './logger';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -25,6 +28,9 @@ const ptyManager = new PtyManager();
 const settings = new SettingsStore();
 const PIPE_NAME = `\\\\.\\pipe\\claude-terminal-${process.pid}`;
 let ipcServer: HookIpcServer | null = null;
+const tunnelManager = new TunnelManager();
+let webRemoteServer: WebRemoteServer | null = null;
+const REMOTE_PORT = 3456;
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -63,13 +69,27 @@ function sendToRenderer(channel: string, ...args: unknown[]) {
   if (win && !win.isDestroyed()) {
     win.webContents.send(channel, ...args);
   }
+  // Forward relevant events to remote WebSocket clients
+  if (webRemoteServer) {
+    if (channel === 'pty:data') {
+      webRemoteServer.broadcast({ type: 'pty:data', tabId: args[0], data: args[1] });
+    } else if (channel === 'tab:updated') {
+      webRemoteServer.broadcast({ type: 'tab:updated', tab: args[0] });
+    } else if (channel === 'tab:removed') {
+      webRemoteServer.broadcast({ type: 'tab:removed', tabId: args[0] });
+    } else if (channel === 'pty:resized') {
+      webRemoteServer.broadcast({ type: 'pty:resized', tabId: args[0], cols: args[1], rows: args[2] });
+    } else if (channel === 'tab:switched') {
+      webRemoteServer.broadcast({ type: 'tab:switched', tabId: args[0] });
+    }
+  }
 }
 
 function persistSessions() {
   if (!state.workspaceDir) return;
   const allTabs = tabManager.getAllTabs();
   const savedTabs = allTabs
-    .filter(t => t.sessionId && t.type === 'claude')
+    .filter(t => t.sessionId && t.type === 'claude' && t.status !== 'new')
     .map(t => ({
       name: t.name,
       cwd: t.cwd,
@@ -77,6 +97,57 @@ function persistSessions() {
       sessionId: t.sessionId!,
     }));
   settings.saveSessions(state.workspaceDir, savedTabs);
+}
+
+// ---------------------------------------------------------------------------
+// Remote access
+// ---------------------------------------------------------------------------
+function getRemoteAccessInfo(): RemoteAccessInfo {
+  if (!webRemoteServer) {
+    return { status: 'inactive', tunnelUrl: null, token: null, error: null };
+  }
+  return {
+    status: tunnelManager.isActive ? 'active' : 'connecting',
+    tunnelUrl: tunnelManager.url,
+    token: webRemoteServer.accessToken,
+    error: null,
+  };
+}
+
+async function activateRemoteAccess(): Promise<RemoteAccessInfo> {
+  if (webRemoteServer) return getRemoteAccessInfo();
+
+  webRemoteServer = new WebRemoteServer({
+    tabManager, ptyManager, state,
+    sendToRenderer, persistSessions,
+    serializeTerminal: async (tabId: string): Promise<string> => {
+      const win = state.mainWindow as BrowserWindow | null;
+      if (!win || win.isDestroyed()) return '';
+      const escaped = tabId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return win.webContents.executeJavaScript(
+        `window.__serializeTerminal('${escaped}')`,
+      );
+    },
+  });
+
+  try {
+    await webRemoteServer.start(REMOTE_PORT);
+    await tunnelManager.start(REMOTE_PORT);
+  } catch (err) {
+    log.error('[remote] Failed to activate:', String(err));
+    webRemoteServer?.stop();
+    webRemoteServer = null;
+    tunnelManager.stop();
+    return { status: 'error', tunnelUrl: null, token: null, error: String(err) };
+  }
+
+  return getRemoteAccessInfo();
+}
+
+async function deactivateRemoteAccess(): Promise<void> {
+  tunnelManager.stop();
+  webRemoteServer?.stop();
+  webRemoteServer = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +161,24 @@ const { handleHookMessage } = createHookRouter({
   tabManager, sendToRenderer, persistSessions,
   generateTabName, cleanupNamingFlag,
   getMainWindow: () => state.mainWindow as BrowserWindow | null,
+});
+
+// ---------------------------------------------------------------------------
+// Tunnel event listeners
+// ---------------------------------------------------------------------------
+tunnelManager.on('url', () => {
+  sendToRenderer('remote:updated', getRemoteAccessInfo());
+});
+tunnelManager.on('connected', () => {
+  sendToRenderer('remote:updated', getRemoteAccessInfo());
+});
+tunnelManager.on('error', (err: Error) => {
+  sendToRenderer('remote:updated', {
+    status: 'error', tunnelUrl: null, token: null, error: String(err),
+  });
+});
+tunnelManager.on('exit', () => {
+  sendToRenderer('remote:updated', getRemoteAccessInfo());
 });
 
 // ---------------------------------------------------------------------------
@@ -192,6 +281,7 @@ app.on('ready', async () => {
   registerIpcHandlers({
     tabManager, ptyManager, settings, state,
     sendToRenderer, persistSessions, cleanupNamingFlag,
+    activateRemoteAccess, deactivateRemoteAccess, getRemoteAccessInfo,
   });
 
   createWindow();
@@ -206,6 +296,8 @@ app.on('window-all-closed', async () => {
   }
 
   ptyManager.killAll();
+  tunnelManager.stop();
+  webRemoteServer?.stop();
   if (ipcServer) {
     try { await ipcServer.stop(); } catch { /* best-effort */ }
   }

@@ -6,6 +6,11 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
+    exclude: [
+      '.claude/worktrees/**',
+      '.worktrees/**',
+      'node_modules/**',
+    ],
   },
   resolve: {
     alias: {

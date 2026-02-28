@@ -39,6 +39,20 @@ describe('WorktreeManager', () => {
     expect(result).toContain(path.join('feature', 'auth'));
   });
 
+  it('checkStatus returns clean for worktree with no changes', () => {
+    mockExecSync.mockReturnValue(Buffer.from(''));
+    const status = manager.checkStatus('D:\\dev\\MyApp\\.claude\\worktrees\\feat');
+    expect(status.clean).toBe(true);
+    expect(status.changesCount).toBe(0);
+  });
+
+  it('checkStatus returns dirty for worktree with changes', () => {
+    mockExecSync.mockReturnValue(Buffer.from('M  src/index.ts\n?? new-file.ts\n'));
+    const status = manager.checkStatus('D:\\dev\\MyApp\\.claude\\worktrees\\feat');
+    expect(status.clean).toBe(false);
+    expect(status.changesCount).toBe(2);
+  });
+
   it('removes a worktree', () => {
     mockExecSync.mockReturnValue(Buffer.from(''));
     manager.remove('feature/auth');

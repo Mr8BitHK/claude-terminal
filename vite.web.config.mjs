@@ -1,17 +1,17 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-// https://vitejs.dev/config
 export default defineConfig({
+  root: './src/web-client',
+  plugins: [react()],
+  build: {
+    outDir: '../../dist/web-client',
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       '@shared': path.resolve('src/shared'),
-      '@main': path.resolve('src/main'),
-    },
-  },
-  build: {
-    rollupOptions: {
-      external: ['node-pty', 'cloudflared', 'ws', 'qrcode'],
     },
   },
 });

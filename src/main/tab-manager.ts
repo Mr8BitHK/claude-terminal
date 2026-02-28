@@ -86,6 +86,18 @@ export class TabManager {
     return this.activeTabId;
   }
 
+  reorderTabs(tabIds: string[]): void {
+    const entries = new Map<string, Tab>();
+    for (const id of tabIds) {
+      const tab = this.tabs.get(id);
+      if (tab) entries.set(id, tab);
+    }
+    for (const [id, tab] of this.tabs) {
+      if (!entries.has(id)) entries.set(id, tab);
+    }
+    this.tabs = entries;
+  }
+
   setActiveTab(id: string): void {
     if (this.tabs.has(id)) {
       this.activeTabId = id;

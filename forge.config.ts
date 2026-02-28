@@ -74,6 +74,20 @@ const config: ForgeConfig = {
             if (err2) return callback(err2);
             fs.cp(hooksSrc, hooksDest, { recursive: true }, (err3) => {
               if (err3) return callback(err3);
+              // 5. Copy web client build output for remote access.
+              const webClientSrc = path.join(__dirname, 'dist', 'web-client');
+              const webClientDest = path.join(buildPath, '..', 'web-client');
+              const copyWebClient = (next: () => void) => {
+                if (fs.existsSync(webClientSrc)) {
+                  fs.cp(webClientSrc, webClientDest, { recursive: true }, (err4) => {
+                    if (err4) return callback(err4);
+                    next();
+                  });
+                } else {
+                  next(); // web client not built — skip (remote access won't work)
+                }
+              };
+              copyWebClient(() => {
               // Strip locales
               try {
                 if (fs.existsSync(localesDir)) {
@@ -87,6 +101,7 @@ const config: ForgeConfig = {
                 // Non-fatal: locale stripping is an optimization, not a requirement
               }
               callback();
+              }); // copyWebClient
             });
           });
         });
