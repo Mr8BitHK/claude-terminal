@@ -26,8 +26,8 @@ body {
   border-right: 1px solid #3c3c3c; font-size: 13px;
   -webkit-app-region: no-drag; user-select: none;
 }
-.tab:hover { background: #2a2d2e; }
-.tab-active { background: #1e1e1e; border-bottom: 2px solid #007acc; }
+.tab:hover { background: #37373d; }
+.tab-active { background: #37373d; border-bottom: 2px solid #c9d1d9; }
 
 .tab-indicator { display: inline-flex; align-items: center; }
 .tab-indicator svg { width: 12px; height: 12px; }
@@ -74,12 +74,13 @@ body {
 
 .status-bar {
   display: flex; gap: 16px; padding: 2px 12px;
-  background: #007acc; color: #fff; font-size: 12px;
+  background: #252526; color: #808080; font-size: 12px;
   min-height: 22px; align-items: center;
+  border-top: 1px solid #3c3c3c;
 }
 .status-counts { display: flex; gap: 12px; align-items: center; }
 .status-count { display: inline-flex; align-items: center; gap: 3px; }
-.status-bar .tab-indicator { color: #fff; }
+.status-bar .tab-indicator { color: inherit; }
 .status-help { margin-left: auto; }
 
 .dialog-overlay {
