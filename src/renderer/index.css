@@ -222,7 +222,7 @@ body {
 
 /* Shell tab styling */
 .tab-shell { border-top: 2px solid transparent; }
-.tab-shell-powershell { border-top-color: #012456; }
+.tab-shell-powershell { border-top-color: #2472c8; }
 .tab-shell-wsl { border-top-color: #e95420; }
 .tab-status-shell .tab-indicator { color: #569cd6; }
 
