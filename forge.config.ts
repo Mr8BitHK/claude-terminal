@@ -9,10 +9,26 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import path from 'node:path';
 import fs from 'node:fs';
 
+/** Recursively delete files matching a test from a directory. */
+function pruneFiles(dir: string, test: (name: string) => boolean): void {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      pruneFiles(full, test);
+    } else if (test(entry.name)) {
+      fs.unlinkSync(full);
+    }
+  }
+}
+
+const junkPattern = /\.(map|md|ts)$|^(LICENSE|LICENCE|CHANGELOG|CHANGES|HISTORY|AUTHORS|CONTRIBUTORS|README)(\..*)?$/i;
+
 const config: ForgeConfig = {
   packagerConfig: {
-    // Disable asar so native modules (node-pty) can load their binaries directly.
-    asar: false,
+    asar: {
+      unpack: '{**/node-pty/**/*.node,**/node-pty/**/spawn-helper*,**/node-pty/**/winpty*,**/node-pty/**/conpty*}',
+    },
     afterCopy: [
       // The Vite plugin only packages Vite build output, not node_modules.
       // Native modules like node-pty must be copied manually.
@@ -35,12 +51,40 @@ const config: ForgeConfig = {
         const hooksSrc = path.join(__dirname, 'src', 'hooks');
         const hooksDest = path.join(buildPath, '..', 'hooks');
 
+        // 4. Strip unused Chromium locales (keep only en-US) — saves ~44 MB.
+        //    buildPath is resources/app, locales are at the top level next to resources.
+        const localesDir = path.join(buildPath, '..', '..', 'locales');
+
         fs.cp(ptySrc, ptyDest, { recursive: true }, (err) => {
           if (err) return callback(err);
+          // Strip junk files from copied node-pty
+          pruneFiles(ptyDest, (name) => junkPattern.test(name));
+          // Strip prebuilds for other platforms (keeps only current platform+arch)
+          const prebuildsDir = path.join(ptyDest, 'prebuilds');
+          const keepDir = `${_platform}-${_arch}`;
+          if (fs.existsSync(prebuildsDir)) {
+            for (const dir of fs.readdirSync(prebuildsDir)) {
+              if (dir !== keepDir) {
+                fs.rmSync(path.join(prebuildsDir, dir), { recursive: true });
+              }
+            }
+          }
           fs.cp(rendererSrc, rendererDest, { recursive: true }, (err2) => {
             if (err2) return callback(err2);
             fs.cp(hooksSrc, hooksDest, { recursive: true }, (err3) => {
               if (err3) return callback(err3);
+              // Strip locales
+              try {
+                if (fs.existsSync(localesDir)) {
+                  for (const file of fs.readdirSync(localesDir)) {
+                    if (file !== 'en-US.pak') {
+                      fs.unlinkSync(path.join(localesDir, file));
+                    }
+                  }
+                }
+              } catch (e) {
+                // Non-fatal: locale stripping is an optimization, not a requirement
+              }
               callback();
             });
           });
@@ -93,9 +137,8 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      // Disabled: no asar archive when native modules need direct filesystem access
-      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false,
-      [FuseV1Options.OnlyLoadAppFromAsar]: false,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
 };
