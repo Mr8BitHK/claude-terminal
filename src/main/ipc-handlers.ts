@@ -2,8 +2,10 @@ import { app, dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { PermissionMode, RemoteAccessInfo } from '@shared/types';
+import type { PermissionMode, RemoteAccessInfo, RepoHookConfig } from '@shared/types';
 import { PERMISSION_FLAGS } from '@shared/types';
+import { HookConfigStore } from './hook-config-store';
+import { HookEngine } from './hook-engine';
 import { WorktreeManager } from './worktree-manager';
 import { HookInstaller } from './hook-installer';
 import type { TabManager } from './tab-manager';
@@ -16,6 +18,8 @@ export interface AppState {
   permissionMode: PermissionMode;
   worktreeManager: WorktreeManager | null;
   hookInstaller: HookInstaller | null;
+  hookConfigStore: HookConfigStore | null;
+  hookEngine: HookEngine | null;
   mainWindow: { setTitle: (title: string) => void } | null;
   cliStartDir: string | null;
   pipeName: string;
@@ -60,10 +64,16 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
       log.debug('[session:start] hooksDir:', projectRoot);
       log.debug('[session:start] hooks exist:', fs.existsSync(path.join(projectRoot, 'pipe-send.js')));
       state.hookInstaller = new HookInstaller(projectRoot);
+      state.hookConfigStore = new HookConfigStore(dir);
+      state.hookEngine = new HookEngine(state.hookConfigStore, (status) => {
+        deps.sendToRenderer('hook:status', status);
+      });
 
       // Watch .git/HEAD for branch changes
       gitHeadWatcher?.close();
       gitHeadWatcher = null;
+      let lastKnownBranch = '';
+      try { lastKnownBranch = state.worktreeManager!.getCurrentBranch(); } catch {}
       const gitHeadPath = path.join(dir, '.git', 'HEAD');
       if (fs.existsSync(gitHeadPath)) {
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,10 +83,18 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
             try {
               const branch = state.worktreeManager?.getCurrentBranch() ?? null;
               deps.sendToRenderer('git:branchChanged', branch);
+              if (branch && state.hookEngine) {
+                state.hookEngine.emit('branch:changed', { contextRoot: dir, from: lastKnownBranch, to: branch });
+                lastKnownBranch = branch;
+              }
             } catch { /* not a git repo or git error */ }
           }, 1000);
         });
         gitHeadWatcher.on('error', () => { /* ignore watch errors */ });
+      }
+
+      if (state.hookEngine) {
+        state.hookEngine.emit('app:started', { contextRoot: dir, cwd: dir });
       }
     },
   );
@@ -159,6 +177,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
 
     deps.sendToRenderer('tab:updated', tab);
     deps.persistSessions();
+    if (state.hookEngine) {
+      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: 'claude' });
+    }
     return tab;
   });
 
@@ -314,10 +335,17 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     tabManager.setActiveTab(tab.id);
 
     deps.sendToRenderer('tab:updated', tab);
+    if (state.hookEngine) {
+      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: shellType });
+    }
     return tab;
   });
 
   ipcMain.handle('tab:close', async (_event, tabId: string, removeWorktree?: boolean) => {
+    const closingTab = tabManager.getTab(tabId);
+    if (closingTab && state.hookEngine) {
+      state.hookEngine.emit('tab:closed', { contextRoot: closingTab.cwd, tabId, cwd: closingTab.cwd });
+    }
     ptyManager.kill(tabId);
     flowControl.delete(tabId);
     deps.cleanupNamingFlag(tabId);
@@ -372,7 +400,13 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   // ---- Worktree ----
   ipcMain.handle('worktree:create', async (_event, name: string) => {
     if (!state.worktreeManager) throw new Error('Session not started');
-    return state.worktreeManager.create(name);
+    const worktreePath = state.worktreeManager.create(name);
+    // Fire repo hooks (fire-and-forget)
+    // The worktree branch is named after `name` (see WorktreeManager.create)
+    if (state.hookEngine) {
+      state.hookEngine.emit('worktree:created', { contextRoot: worktreePath, name, path: worktreePath, branch: name });
+    }
+    return worktreePath;
   });
 
   ipcMain.handle('worktree:currentBranch', async () => {
@@ -388,6 +422,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   ipcMain.handle('worktree:remove', async (_event, worktreePath: string) => {
     if (!state.worktreeManager) throw new Error('Session not started');
     state.worktreeManager.remove(worktreePath);
+    if (state.hookEngine) {
+      state.hookEngine.emit('worktree:removed', { contextRoot: state.workspaceDir!, name: path.basename(worktreePath), path: worktreePath });
+    }
   });
 
   ipcMain.handle('worktree:checkStatus', async (_event, worktreePath: string) => {
@@ -406,6 +443,17 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
 
   ipcMain.handle('settings:permissionMode', async () => {
     return settings.getPermissionMode();
+  });
+
+  // ---- Hook Config ----
+  ipcMain.handle('hookConfig:load', async () => {
+    if (!state.hookConfigStore) throw new Error('Session not started');
+    return state.hookConfigStore.load();
+  });
+
+  ipcMain.handle('hookConfig:save', async (_event, config: RepoHookConfig) => {
+    if (!state.hookConfigStore) throw new Error('Session not started');
+    state.hookConfigStore.save(config);
   });
 
   // ---- Dialog ----

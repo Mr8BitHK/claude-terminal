@@ -92,6 +92,8 @@ function makeMockDeps(): IpcHandlerDeps {
       permissionMode: 'bypassPermissions' as const,
       worktreeManager: null,
       hookInstaller: null,
+      hookConfigStore: null,
+      hookEngine: null,
       mainWindow: null,
       cliStartDir: null,
       pipeName: '\\\\.\\pipe\\test-pipe',

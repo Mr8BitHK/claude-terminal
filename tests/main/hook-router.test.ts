@@ -38,6 +38,7 @@ function makeMockDeps() {
     generateTabName: vi.fn(),
     cleanupNamingFlag: vi.fn(),
     getMainWindow: vi.fn(() => ({ show: vi.fn(), focus: vi.fn() })),
+    hookEngine: null,
   };
 }
 

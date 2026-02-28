@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Menu, GitBranch } from 'lucide-react';
+import { Menu, GitBranch, Zap } from 'lucide-react';
 
 interface HamburgerMenuProps {
   worktreeCount: number;
   onManageWorktrees: () => void;
+  onManageHooks: () => void;
 }
 
-export default function HamburgerMenu({ worktreeCount, onManageWorktrees }: HamburgerMenuProps) {
+export default function HamburgerMenu({ worktreeCount, onManageWorktrees, onManageHooks }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,13 @@ export default function HamburgerMenu({ worktreeCount, onManageWorktrees }: Hamb
             <GitBranch size={14} />
             <span>Manage worktrees</span>
             {worktreeCount === 0 && <span className="hamburger-item-hint">No worktrees</span>}
+          </button>
+          <button
+            className="hamburger-item"
+            onClick={() => { setOpen(false); onManageHooks(); }}
+          >
+            <Zap size={14} />
+            <span>Manage hooks</span>
           </button>
         </div>
       )}

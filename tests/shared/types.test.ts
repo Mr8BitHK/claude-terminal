@@ -1,4 +1,5 @@
-import { TabStatus, Tab, IpcMessage, PermissionMode } from '@shared/types';
+import { TabStatus, Tab, IpcMessage, PermissionMode, HOOK_EVENTS } from '@shared/types';
+import type { RepoHookConfig, RepoHook, HookCommand, HookEvent } from '@shared/types';
 
 describe('shared types', () => {
   it('TabStatus has all expected values', () => {
@@ -34,5 +35,34 @@ describe('shared types', () => {
   it('PermissionMode has expected values', () => {
     const modes: PermissionMode[] = ['default', 'plan', 'acceptEdits', 'bypassPermissions'];
     expect(modes).toHaveLength(4);
+  });
+});
+
+describe('RepoHook types', () => {
+  it('HOOK_EVENTS contains all supported events', () => {
+    expect(HOOK_EVENTS).toContain('worktree:created');
+    expect(HOOK_EVENTS).toContain('worktree:removed');
+    expect(HOOK_EVENTS).toContain('tab:created');
+    expect(HOOK_EVENTS).toContain('tab:closed');
+    expect(HOOK_EVENTS).toContain('session:started');
+    expect(HOOK_EVENTS).toContain('app:started');
+    expect(HOOK_EVENTS).toContain('branch:changed');
+    expect(HOOK_EVENTS.length).toBe(7);
+  });
+
+  it('RepoHookConfig shape is valid', () => {
+    const config: RepoHookConfig = {
+      hooks: [
+        {
+          id: 'test',
+          name: 'Test hook',
+          event: 'worktree:created',
+          commands: [{ path: '.', command: 'echo hello' }],
+          enabled: true,
+        },
+      ],
+    };
+    expect(config.hooks).toHaveLength(1);
+    expect(config.hooks[0].commands[0].path).toBe('.');
   });
 });
