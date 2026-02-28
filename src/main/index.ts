@@ -165,6 +165,23 @@ function cleanupNamingFlag(tabId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: persist current tab sessions to disk
+// ---------------------------------------------------------------------------
+function persistSessions() {
+  if (!workspaceDir) return;
+  const allTabs = tabManager.getAllTabs();
+  const savedTabs = allTabs
+    .filter(t => t.sessionId)
+    .map(t => ({
+      name: t.name,
+      cwd: t.cwd,
+      worktree: t.worktree,
+      sessionId: t.sessionId!,
+    }));
+  settings.saveSessions(workspaceDir, savedTabs);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: generate a smart tab name using Claude Haiku
 // ---------------------------------------------------------------------------
 function generateTabName(tabId: string, prompt: string) {
@@ -205,6 +222,7 @@ function generateTabName(tabId: string, prompt: string) {
     const updated = tabManager.getTab(tabId);
     if (updated) {
       sendToRenderer('tab:updated', updated);
+      persistSessions();
     }
   });
 
@@ -250,6 +268,7 @@ function handleHookMessage(msg: IpcMessage) {
       if (sessionId) {
         tabManager.setSessionId(tabId, sessionId);
       }
+      persistSessions();
       break;
     }
 
@@ -281,6 +300,7 @@ function handleHookMessage(msg: IpcMessage) {
     case 'tab:name':
       if (data) {
         tabManager.rename(tabId, data);
+        persistSessions();
       }
       break;
 
@@ -330,10 +350,12 @@ function registerIpcHandlers() {
   });
 
   // ---- Tabs ----
-  ipcMain.handle('tab:create', async (_event, worktree: string | null, resumeSessionId?: string, savedName?: string) => {
+  ipcMain.handle('tab:create', async (_event, worktreeName: string | null, resumeSessionId?: string, savedName?: string) => {
     if (!workspaceDir) throw new Error('Session not started');
-    const cwd = worktree ?? workspaceDir;
-    const tab = tabManager.createTab(cwd, worktree, savedName);
+    const cwd = worktreeName
+      ? path.join(workspaceDir, '.claude', 'worktrees', worktreeName)
+      : workspaceDir;
+    const tab = tabManager.createTab(cwd, worktreeName, savedName);
 
     // If restoring with a saved name, pre-create the naming flag so the
     // on-prompt-submit hook skips auto-naming for this tab.
@@ -378,6 +400,7 @@ function registerIpcHandlers() {
         cleanupNamingFlag(tab.id);
         tabManager.removeTab(tab.id);
         sendToRenderer('tab:removed', tab.id);
+        persistSessions();
       }
     });
 
@@ -387,6 +410,7 @@ function registerIpcHandlers() {
     }
 
     sendToRenderer('tab:updated', tab);
+    persistSessions();
     return tab;
   });
 
@@ -396,13 +420,14 @@ function registerIpcHandlers() {
     const tab = tabManager.getTab(tabId);
     if (tab?.worktree && worktreeManager) {
       try {
-        worktreeManager.remove(tab.worktree);
+        worktreeManager.remove(tab.cwd);
       } catch {
         // worktree removal is best-effort
       }
     }
     tabManager.removeTab(tabId);
     sendToRenderer('tab:removed', tabId);
+    persistSessions();
   });
 
   ipcMain.handle('tab:switch', async (_event, tabId: string) => {
@@ -514,24 +539,8 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', async () => {
-  // Save tab sessions before cleanup
-  const allTabs = tabManager.getAllTabs();
-  log.info('[quit] workspaceDir:', workspaceDir, 'tabs:', allTabs.length,
-    'sessionIds:', allTabs.map(t => t.sessionId ?? 'null').join(', '));
-  if (workspaceDir) {
-    const savedTabs = allTabs
-      .filter(t => t.sessionId)
-      .map(t => ({
-        name: t.name,
-        cwd: t.cwd,
-        worktree: t.worktree,
-        sessionId: t.sessionId!,
-      }));
-    log.info('[quit] saving', savedTabs.length, 'tabs to', workspaceDir);
-    if (savedTabs.length > 0) {
-      settings.saveSessions(workspaceDir, savedTabs);
-    }
-  }
+  log.info('[quit] workspaceDir:', workspaceDir, 'tabs:', tabManager.getAllTabs().length);
+  persistSessions();
 
   // Clean up all naming flag files
   for (const tab of tabManager.getAllTabs()) {
