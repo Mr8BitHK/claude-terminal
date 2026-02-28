@@ -465,6 +465,16 @@ function registerIpcHandlers() {
     return worktreeManager.getCurrentBranch();
   });
 
+  ipcMain.handle('worktree:listDetails', async () => {
+    if (!worktreeManager) throw new Error('Session not started');
+    return worktreeManager.listDetails();
+  });
+
+  ipcMain.handle('worktree:remove', async (_event, worktreePath: string) => {
+    if (!worktreeManager) throw new Error('Session not started');
+    worktreeManager.remove(worktreePath);
+  });
+
   // ---- Settings ----
   ipcMain.handle('settings:recentDirs', async () => {
     return settings.getRecentDirs();
