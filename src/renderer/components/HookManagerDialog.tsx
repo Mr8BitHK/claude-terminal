@@ -117,9 +117,14 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
     setDirty(false);
   };
 
+  const handleClose = useCallback(() => {
+    if (dirty && !window.confirm('You have unsaved changes. Close anyway?')) return;
+    onClose();
+  }, [dirty, onClose]);
+
   if (loading) {
     return (
-      <div className="dialog-overlay" onClick={onClose}>
+      <div className="dialog-overlay" onClick={handleClose}>
         <div className="dialog hook-dialog" onClick={e => e.stopPropagation()}>
           <p>Loading...</p>
         </div>
@@ -128,7 +133,7 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
   }
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    <div className="dialog-overlay" onClick={handleClose}>
       <div className="dialog hook-dialog" onClick={e => e.stopPropagation()}>
         <h2>Manage Hooks</h2>
         <div className="hook-layout">
@@ -254,7 +259,7 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
           {dirty && (
             <button className="hook-save-btn" onClick={handleSave}>Save</button>
           )}
-          <button onClick={onClose}>Close</button>
+          <button onClick={handleClose}>Close</button>
         </div>
       </div>
     </div>

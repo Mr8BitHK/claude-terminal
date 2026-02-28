@@ -71,7 +71,7 @@ export function createHookRouter(deps: HookRouterDeps) {
         }
         deps.persistSessions();
         if (deps.hookEngine && sessionId) {
-          deps.hookEngine.emit('session:started' as any, { contextRoot: tab.cwd, tabId, sessionId });
+          deps.hookEngine.emit('session:started', { contextRoot: tab.cwd, tabId, sessionId });
         }
         break;
       }

@@ -72,6 +72,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
       // Watch .git/HEAD for branch changes
       gitHeadWatcher?.close();
       gitHeadWatcher = null;
+      let lastKnownBranch = '';
+      try { lastKnownBranch = state.worktreeManager!.getCurrentBranch(); } catch {}
       const gitHeadPath = path.join(dir, '.git', 'HEAD');
       if (fs.existsSync(gitHeadPath)) {
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,7 +84,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
               const branch = state.worktreeManager?.getCurrentBranch() ?? null;
               deps.sendToRenderer('git:branchChanged', branch);
               if (branch && state.hookEngine) {
-                state.hookEngine.emit('branch:changed', { contextRoot: dir, from: '', to: branch });
+                state.hookEngine.emit('branch:changed', { contextRoot: dir, from: lastKnownBranch, to: branch });
+                lastKnownBranch = branch;
               }
             } catch { /* not a git repo or git error */ }
           }, 1000);
@@ -224,6 +227,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     tabManager.setActiveTab(tab.id);
 
     deps.sendToRenderer('tab:updated', tab);
+    if (state.hookEngine) {
+      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: shellType });
+    }
     return tab;
   });
 
