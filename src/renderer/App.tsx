@@ -35,11 +35,11 @@ export default function App() {
       if (cancelled) return;
 
       const savedTabs = await window.claudeTerminal.getSavedTabs(cliDir);
-      if (savedTabs.length > 0) {
-        for (const saved of savedTabs) {
-          const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name);
-          setActiveTabId(tab.id);
-        }
+      for (const saved of savedTabs) {
+        if (cancelled) return;
+        const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name);
+        if (cancelled) return;
+        setActiveTabId(tab.id);
       }
 
       const allTabs = await window.claudeTerminal.getTabs();
