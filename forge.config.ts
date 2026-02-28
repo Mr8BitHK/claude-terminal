@@ -104,6 +104,7 @@ const config: ForgeConfig = {
       exe: 'ClaudeTerminal.exe',
       setupExe: 'ClaudeTerminalSetup.exe',
       setupIcon: './assets/icon.ico',
+      loadingGif: './assets/installer.gif',
       description: 'A Windows Terminal-like app for managing multiple Claude Code instances in tabs',
       authors: 'Yaron Guan Golan',
       noMsi: true,
