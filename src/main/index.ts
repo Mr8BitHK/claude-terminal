@@ -117,6 +117,24 @@ const createWindow = () => {
 
   mainWindow.webContents.on('did-finish-load', () => log.attach(mainWindow!));
 
+  mainWindow.on('close', (event) => {
+    const workingTabs = tabManager.getAllTabs().filter(t => t.status === 'working');
+    if (workingTabs.length > 0) {
+      const names = workingTabs.map(t => t.name).join(', ');
+      const result = dialog.showMessageBoxSync(mainWindow!, {
+        type: 'warning',
+        buttons: ['Close', 'Cancel'],
+        defaultId: 1,
+        title: 'Close ClaudeTerminal?',
+        message: `${workingTabs.length === 1 ? '1 tab is' : `${workingTabs.length} tabs are`} still running`,
+        detail: names,
+      });
+      if (result === 1) {
+        event.preventDefault();
+      }
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
