@@ -69,12 +69,21 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
         <div className="dir-section">
           <label className="section-label">Directory</label>
           {recentDirs.length > 0 && (
-            <ul className="recent-dirs">
+            <ul className="recent-dirs" role="listbox" aria-label="Recent directories">
               {recentDirs.map((dir) => (
                 <li
                   key={dir}
+                  role="option"
+                  tabIndex={0}
+                  aria-selected={selectedDir === dir}
                   className={selectedDir === dir ? 'selected' : ''}
                   onClick={() => setSelectedDir(dir)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedDir(dir);
+                    }
+                  }}
                 >
                   <span className="dir-path">{dir}</span>
                   <button
