@@ -85,6 +85,13 @@ export default function Terminal({ tabId, isVisible }: TerminalProps) {
           return false;
         if (e.ctrlKey && e.key >= '1' && e.key <= '9') return false;
         if (e.key === 'F2') return false;
+        // Ctrl+Enter: insert newline instead of submitting
+        if (e.ctrlKey && e.key === 'Enter') {
+          if (e.type === 'keydown') {
+            window.claudeTerminal.writeToPty(tabId, '\x1b\r');
+          }
+          return false;
+        }
         return true;
       });
 
