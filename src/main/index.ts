@@ -89,7 +89,7 @@ function persistSessions() {
   if (!state.workspaceDir) return;
   const allTabs = tabManager.getAllTabs();
   const savedTabs = allTabs
-    .filter(t => t.sessionId && t.type === 'claude' && t.status !== 'new')
+    .filter(t => t.sessionId && t.type === 'claude')
     .map(t => ({
       name: t.name,
       cwd: t.cwd,
