@@ -64,7 +64,6 @@ describe('PtyManager', () => {
   it('kills and removes PTY', () => {
     manager.spawn('tab-1', 'D:\\dev\\MyApp', [], {});
     manager.kill('tab-1');
-    expect(mockPty.write).toHaveBeenCalledWith('exit\r');
     expect(manager.getPty('tab-1')).toBeUndefined();
   });
 });

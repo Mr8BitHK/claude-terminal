@@ -17,29 +17,29 @@ describe('buildWindowTitle', () => {
     expect(buildWindowTitle('D:\\dev', [])).toBe('ClaudeTerminal - D:\\dev');
   });
 
-  it('shows single working tab', () => {
+  it('shows Busy for working tabs', () => {
     const tabs = [makeTab('working')];
-    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [1 Working]');
+    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [Busy]');
   });
 
-  it('shows multiple states, hides zero counts', () => {
+  it('shows Needs Attention when any tab requires response', () => {
     const tabs = [makeTab('working'), makeTab('working'), makeTab('idle'), makeTab('requires_response')];
-    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [2 Working, 1 Idle, 1 Input]');
+    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [Needs Attention]');
   });
 
-  it('hides states with zero count', () => {
+  it('shows Idle when all tabs are idle', () => {
     const tabs = [makeTab('idle'), makeTab('idle')];
-    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [2 Idle]');
+    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [Idle]');
   });
 
-  it('shows New state', () => {
+  it('shows Idle for new tabs', () => {
     const tabs = [makeTab('new')];
-    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [1 New]');
+    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [Idle]');
   });
 
-  it('shows all four states when all present', () => {
+  it('shows Needs Attention when requires_response is present among all states', () => {
     const tabs = [makeTab('new'), makeTab('working'), makeTab('idle'), makeTab('requires_response')];
-    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [1 New, 1 Working, 1 Idle, 1 Input]');
+    expect(buildWindowTitle('D:\\dev', tabs)).toBe('ClaudeTerminal - D:\\dev [Needs Attention]');
   });
 
   it('uses fallback title when no workspace dir', () => {
@@ -48,6 +48,6 @@ describe('buildWindowTitle', () => {
 
   it('uses fallback title with tabs but no workspace dir', () => {
     const tabs = [makeTab('working')];
-    expect(buildWindowTitle(null, tabs)).toBe('ClaudeTerminal [1 Working]');
+    expect(buildWindowTitle(null, tabs)).toBe('ClaudeTerminal [Busy]');
   });
 });
