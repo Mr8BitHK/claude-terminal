@@ -47,8 +47,9 @@ export class WebRemoteServer {
 
   constructor(deps: WebRemoteServerDeps) {
     this.deps = deps;
-    // 4-digit PIN — easy to type on mobile
-    this.token = String(crypto.randomInt(0, 10000)).padStart(4, '0');
+    // 6-character alphanumeric code
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    this.token = Array.from({ length: 6 }, () => chars[crypto.randomInt(0, chars.length)]).join('');
   }
 
   get accessToken(): string {

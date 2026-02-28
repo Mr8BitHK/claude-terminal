@@ -118,7 +118,7 @@ export default function RemoteAccessButton({ remoteInfo, onActivate, onDeactivat
 
               {remoteInfo.token && (
                 <div className="remote-access-field">
-                  <span className="remote-access-label">PIN</span>
+                  <span className="remote-access-label">Code</span>
                   <span className="remote-access-value" style={{ letterSpacing: '0.15em', fontWeight: 600 }}>{remoteInfo.token}</span>
                   <button
                     className="remote-access-copy"

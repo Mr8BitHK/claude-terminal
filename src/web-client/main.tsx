@@ -15,6 +15,18 @@ const bridge = new WebSocketBridge();
 // TokenScreen — shown before authentication
 // ---------------------------------------------------------------------------
 
+const TOKEN_KEY = 'claude-remote-token';
+
+async function connectWithToken(
+  token: string,
+  onConnected: (tabs: Tab[], activeTabId: string | null, termSizes: Record<string, { cols: number; rows: number }>) => void,
+): Promise<void> {
+  const result = await bridge.connect(token);
+  sessionStorage.setItem(TOKEN_KEY, token);
+  (window as any).claudeTerminal = bridge.api;
+  onConnected(result.tabs, result.activeTabId, result.termSizes);
+}
+
 function TokenScreen({ onConnected }: {
   onConnected: (tabs: Tab[], activeTabId: string | null, termSizes: Record<string, { cols: number; rows: number }>) => void;
 }) {
@@ -22,21 +34,26 @@ function TokenScreen({ onConnected }: {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
+  // Auto-connect with saved token from a previous session
+  useEffect(() => {
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (!saved) return;
+    setConnecting(true);
+    connectWithToken(saved, onConnected).catch(() => {
+      sessionStorage.removeItem(TOKEN_KEY);
+      setConnecting(false);
+    });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (token.length !== 4 || connecting) return;
+    if (token.length !== 6 || connecting) return;
 
     setConnecting(true);
     setError(null);
 
     try {
-      const result = await bridge.connect(token);
-
-      // Install the bridge as window.claudeTerminal before rendering the app.
-      // This is required because Terminal.tsx calls window.claudeTerminal.* directly.
-      (window as any).claudeTerminal = bridge.api;
-
-      onConnected(result.tabs, result.activeTabId, result.termSizes);
+      await connectWithToken(token, onConnected);
     } catch (err: any) {
       setError(err.message || 'Connection failed');
       setConnecting(false);
@@ -50,16 +67,18 @@ function TokenScreen({ onConnected }: {
           <div className="startup-header">
             <h1>Claude Terminal Remote</h1>
           </div>
+          {connecting ? (
+            <p style={{ color: '#808080', textAlign: 'center' }}>Reconnecting...</p>
+          ) : (
           <form onSubmit={handleSubmit}>
-            <label className="section-label">4-Digit PIN</label>
+            <label className="section-label">Access Code</label>
             <input
               type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={4}
+              autoComplete="off"
+              maxLength={6}
               value={token}
-              onChange={(e) => setToken(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="0000"
+              onChange={(e) => setToken(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
+              placeholder="ABC123"
               autoFocus
               disabled={connecting}
               style={{ textAlign: 'center', letterSpacing: '0.3em', fontSize: '1.5em' }}
@@ -69,12 +88,13 @@ function TokenScreen({ onConnected }: {
               <button
                 type="submit"
                 className="start-btn-primary"
-                disabled={token.length !== 4 || connecting}
+                disabled={token.length !== 6 || connecting}
               >
-                {connecting ? 'Connecting...' : 'Connect'}
+                Connect
               </button>
             </div>
           </form>
+          )}
         </div>
       </div>
     </div>
@@ -242,7 +262,44 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
 
 type AppScreen = 'token' | 'connected' | 'disconnected';
 
-function DisconnectedScreen() {
+function DisconnectedScreen({ onReconnected }: {
+  onReconnected: (tabs: Tab[], activeTabId: string | null, termSizes: Record<string, { cols: number; rows: number }>) => void;
+}) {
+  const [status, setStatus] = useState<'reconnecting' | 'failed'>('reconnecting');
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (!saved) {
+      setStatus('failed');
+      return;
+    }
+
+    let cancelled = false;
+    let attempt = 0;
+    const maxAttempts = 20;
+    const baseDelay = 1000;
+
+    const tryReconnect = () => {
+      if (cancelled) return;
+      attempt++;
+      connectWithToken(saved, onReconnected).catch(() => {
+        if (cancelled) return;
+        if (attempt >= maxAttempts) {
+          sessionStorage.removeItem(TOKEN_KEY);
+          setStatus('failed');
+        } else {
+          const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), 10000);
+          setTimeout(tryReconnect, delay);
+        }
+      });
+    };
+
+    // Small initial delay to let the server recover from whatever caused the disconnect
+    setTimeout(tryReconnect, 1000);
+
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="app">
       <div className="dialog-overlay">
@@ -250,15 +307,21 @@ function DisconnectedScreen() {
           <div className="startup-header">
             <h1>Disconnected</h1>
           </div>
-          <p style={{ color: '#808080', marginBottom: 20 }}>
-            The remote session has ended.
-          </p>
-          <button
-            className="start-btn-primary"
-            onClick={() => window.location.reload()}
-          >
-            Reconnect
-          </button>
+          {status === 'reconnecting' ? (
+            <p style={{ color: '#808080', marginBottom: 20 }}>Reconnecting...</p>
+          ) : (
+            <>
+              <p style={{ color: '#808080', marginBottom: 20 }}>
+                Could not reconnect to the remote session.
+              </p>
+              <button
+                className="start-btn-primary"
+                onClick={() => window.location.reload()}
+              >
+                Try Again
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -287,7 +350,7 @@ function WebClientApp() {
   }
 
   if (screen === 'disconnected') {
-    return <DisconnectedScreen />;
+    return <DisconnectedScreen onReconnected={handleConnected} />;
   }
 
   return (
