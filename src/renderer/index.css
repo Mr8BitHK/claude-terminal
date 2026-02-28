@@ -29,11 +29,23 @@ body {
 .tab:hover { background: #2a2d2e; }
 .tab-active { background: #1e1e1e; border-bottom: 2px solid #007acc; }
 
-.tab-indicator { font-size: 10px; }
+.tab-indicator { display: inline-flex; align-items: center; }
+.tab-indicator svg { width: 12px; height: 12px; }
 .tab-status-working .tab-indicator { color: #dcdcaa; }
 .tab-status-requires_response .tab-indicator { color: #ce9178; }
 .tab-status-idle .tab-indicator { color: #6a9955; }
-.tab-status-new .tab-indicator { color: #569cd6; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.tab-indicator-spin svg { animation: spin 1s linear infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.tab-indicator-pulse svg { animation: pulse 1.5s ease-in-out infinite; }
 
 .tab-worktree { font-size: 11px; color: #808080; margin-left: 4px; }
 
