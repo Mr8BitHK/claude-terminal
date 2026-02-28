@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import * as pty from 'node-pty';
 
 interface ManagedPty {
@@ -80,9 +80,8 @@ export class PtyManager {
     // Instead, use taskkill to kill the entire process tree directly.
     const pid = managed.process.pid;
     if (process.platform === 'win32') {
-      try {
-        execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' });
-      } catch { /* process may have already exited */ }
+      // Fire-and-forget: don't block the main process while taskkill runs
+      exec(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' } as any);
     } else {
       try { managed.process.kill(); } catch { /* already dead */ }
     }
