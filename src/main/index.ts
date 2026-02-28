@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,7 +27,7 @@ const tabManager = new TabManager();
 const ptyManager = new PtyManager();
 const settings = new SettingsStore();
 const PIPE_NAME = `\\\\.\\pipe\\claude-terminal-${process.pid}`;
-const ipcServer = new HookIpcServer(PIPE_NAME);
+let ipcServer: HookIpcServer | null = null;
 
 let worktreeManager: WorktreeManager | null = null;
 let hookInstaller: HookInstaller | null = null;
@@ -65,9 +65,13 @@ const cliStartDir = parseCliStartDir();
 const createWindow = () => {
   Menu.setApplicationMenu(null);
 
+  const iconPath = path.resolve(path.join(__dirname, '../../assets/icon.png'));
+  const appIcon = nativeImage.createFromPath(iconPath);
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: appIcon.isEmpty() ? undefined : appIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -92,6 +96,7 @@ const createWindow = () => {
     : 'ClaudeTerminal';
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow!.setTitle(initialTitle);
+    log.attach(mainWindow!);
   });
 
   // Open clicked links in the user's default browser instead of Electron.
@@ -115,8 +120,6 @@ const createWindow = () => {
       mainWindow!.webContents.toggleDevTools();
     }
   });
-
-  mainWindow.webContents.on('did-finish-load', () => log.attach(mainWindow!));
 
   mainWindow.on('close', (event) => {
     const workingTabs = tabManager.getAllTabs().filter(t => t.status === 'working');
@@ -600,6 +603,7 @@ app.setPath(
 
 app.on('ready', async () => {
   // Start the named-pipe IPC server for hook communication.
+  ipcServer = new HookIpcServer(PIPE_NAME);
   try {
     await ipcServer.start();
     log.info('[ipc-server] listening on pipe');
@@ -623,10 +627,12 @@ app.on('window-all-closed', async () => {
   }
 
   ptyManager.killAll();
-  try {
-    await ipcServer.stop();
-  } catch {
-    // best-effort cleanup
+  if (ipcServer) {
+    try {
+      await ipcServer.stop();
+    } catch {
+      // best-effort cleanup
+    }
   }
   app.quit();
 });
