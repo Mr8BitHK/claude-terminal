@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import * as pty from 'node-pty';
+import { getClaudeCommand } from '@shared/claude-cli';
 
 interface ManagedPty {
   process: pty.IPty;
@@ -21,9 +22,7 @@ export class PtyManager {
 
     // On Windows, `claude` is a .cmd wrapper. node-pty can't resolve .cmd
     // files directly, so we spawn through the system shell.
-    const isWindows = process.platform === 'win32';
-    const shell = isWindows ? 'cmd.exe' : 'claude';
-    const spawnArgs = isWindows ? ['/c', 'claude', ...args] : args;
+    const { command: shell, args: spawnArgs } = getClaudeCommand(args);
 
     const proc = pty.spawn(shell, spawnArgs, {
       name: 'xterm-256color',
