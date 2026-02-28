@@ -33,6 +33,7 @@
     "@electron/fuses": "^1.8.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/cross-spawn": "^6.0.6",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.14",
@@ -59,9 +60,11 @@
   "dependencies": {
     "@lucide/lab": "^0.1.2",
     "cloudflared": "^0.7.1",
+    "cross-spawn": "^7.0.6",
     "electron-squirrel-startup": "^1.0.1",
     "node-pty": "^1.1.0",
     "qrcode": "^1.5.4",
+    "tree-kill": "^1.2.2",
     "ws": "^8.19.0"
   },
   "pnpm": {

@@ -341,3 +341,53 @@ body {
 .new-tab-item:hover { background: #2a2d2e; }
 .new-tab-shortcut { font-size: 11px; color: #808080; }
 .new-tab-separator { height: 1px; background: #3c3c3c; margin: 4px 8px; }
+
+/* ---- Hook Manager Dialog ---- */
+.hook-dialog { width: 700px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; }
+.hook-layout { display: flex; gap: 12px; flex: 1; min-height: 300px; overflow: hidden; }
+
+.hook-list-panel { width: 220px; display: flex; flex-direction: column; border-right: 1px solid #3c3c3c; padding-right: 12px; }
+.hook-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.hook-list-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.hook-list-item:hover { background: #2a2d2e; }
+.hook-list-item-active { background: #37373d; }
+.hook-list-item-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hook-list-item-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hook-badge { font-size: 10px; padding: 1px 4px; border-radius: 3px; background: #3c3c3c; color: #9cdcfe; white-space: nowrap; }
+
+.hook-toggle { position: relative; display: inline-block; width: 28px; height: 16px; flex-shrink: 0; }
+.hook-toggle input { opacity: 0; width: 0; height: 0; }
+.hook-toggle-slider { position: absolute; inset: 0; background: #555; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+.hook-toggle-slider::before { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ccc; transition: transform 0.2s; }
+.hook-toggle input:checked + .hook-toggle-slider { background: #4caf50; }
+.hook-toggle input:checked + .hook-toggle-slider::before { transform: translateX(12px); }
+
+.hook-add-btn { margin-top: 8px; display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: #0e639c; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.hook-add-btn:hover { background: #1177bb; }
+
+.hook-editor-panel { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.hook-field { display: flex; flex-direction: column; gap: 4px; }
+.hook-field label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.hook-field input[type="text"], .hook-field select { background: #3c3c3c; border: 1px solid #555; color: #d4d4d4; padding: 6px 8px; border-radius: 4px; font-size: 13px; font-family: inherit; }
+.hook-field input[type="text"]:focus, .hook-field select:focus { outline: none; border-color: #0e639c; }
+
+.hook-commands { display: flex; flex-direction: column; gap: 4px; }
+.hook-command-row { display: flex; gap: 4px; align-items: center; }
+.hook-cmd-path { width: 100px; flex-shrink: 0; }
+.hook-cmd-command { flex: 1; }
+.hook-cmd-btn { background: none; border: 1px solid #555; color: #888; padding: 4px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; }
+.hook-cmd-btn:hover:not(:disabled) { color: #d4d4d4; border-color: #888; }
+.hook-cmd-btn:disabled { opacity: 0.3; cursor: default; }
+.hook-cmd-delete:hover:not(:disabled) { color: #f44; border-color: #f44; }
+
+.hook-add-cmd-btn { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: none; border: 1px dashed #555; color: #888; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 4px; }
+.hook-add-cmd-btn:hover { color: #d4d4d4; border-color: #888; }
+
+.hook-delete-hook-btn { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: none; border: 1px solid #555; color: #f44; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: auto; align-self: flex-start; }
+.hook-delete-hook-btn:hover { background: rgba(255, 68, 68, 0.1); border-color: #f44; }
+
+.hook-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #666; gap: 8px; }
+.hook-empty p { font-size: 13px; }
+
+.hook-save-btn { background: #4caf50; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.hook-save-btn:hover { background: #45a049; }

@@ -50,3 +50,50 @@ export interface RemoteAccessInfo {
   token: string | null;
   error: string | null;
 }
+
+// --- Repository hooks ---
+
+export const HOOK_EVENTS = [
+  'worktree:created',
+  'worktree:removed',
+  'tab:created',
+  'tab:closed',
+  'session:started',
+  'app:started',
+  'branch:changed',
+] as const;
+
+export type HookEvent = typeof HOOK_EVENTS[number];
+
+export interface HookCommand {
+  path: string;
+  command: string;
+}
+
+export interface RepoHook {
+  id: string;
+  name: string;
+  event: HookEvent;
+  commands: HookCommand[];
+  enabled: boolean;
+}
+
+export interface RepoHookConfig {
+  hooks: RepoHook[];
+}
+
+// IPC status events for hook execution
+export interface HookExecutionStatus {
+  hookId: string;
+  hookName: string;
+  event: HookEvent;
+  commandIndex: number;
+  totalCommands: number;
+  command?: string;
+  path?: string;
+  status: 'running' | 'done' | 'failed';
+  exitCode?: number | null;
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+}

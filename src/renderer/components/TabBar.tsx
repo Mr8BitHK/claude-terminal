@@ -16,6 +16,7 @@ interface TabBarProps {
   onReorderTabs: (tabs: TabType[]) => void;
   worktreeCount: number;
   onManageWorktrees: () => void;
+  onManageHooks: () => void;
   remoteInfo: RemoteAccessInfo;
   onActivateRemote: () => void;
   onDeactivateRemote: () => void;
@@ -33,6 +34,7 @@ export default function TabBar({
   onReorderTabs,
   worktreeCount,
   onManageWorktrees,
+  onManageHooks,
   remoteInfo,
   onActivateRemote,
   onDeactivateRemote,
@@ -148,7 +150,7 @@ export default function TabBar({
         onActivate={onActivateRemote}
         onDeactivate={onDeactivateRemote}
       />
-      <HamburgerMenu worktreeCount={worktreeCount} onManageWorktrees={onManageWorktrees} />
+      <HamburgerMenu worktreeCount={worktreeCount} onManageWorktrees={onManageWorktrees} onManageHooks={onManageHooks} />
     </div>
   );
 }

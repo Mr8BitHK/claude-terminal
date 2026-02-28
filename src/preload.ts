@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PermissionMode, Tab, SavedTab, RemoteAccessInfo } from './shared/types';
+import type { PermissionMode, Tab, SavedTab, RemoteAccessInfo, RepoHookConfig, HookExecutionStatus } from './shared/types';
 
 const api = {
   // Tab operations
@@ -51,6 +51,22 @@ const api = {
     ipcRenderer.invoke('settings:removeRecentDir', dir),
   getPermissionMode: (): Promise<PermissionMode> =>
     ipcRenderer.invoke('settings:permissionMode'),
+
+  // Hook config
+  getHookConfig: (): Promise<RepoHookConfig> =>
+    ipcRenderer.invoke('hookConfig:load'),
+  saveHookConfig: (config: RepoHookConfig): Promise<void> =>
+    ipcRenderer.invoke('hookConfig:save', config),
+
+  // Hook execution status events
+  onHookStatus: (callback: (status: HookExecutionStatus) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: HookExecutionStatus) =>
+      callback(status);
+    ipcRenderer.on('hook:status', handler);
+    return () => {
+      ipcRenderer.removeListener('hook:status', handler);
+    };
+  },
 
   // Window title
   setWindowTitle: (title: string): void =>

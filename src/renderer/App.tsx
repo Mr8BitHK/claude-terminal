@@ -9,6 +9,7 @@ import { buildWindowTitle } from '../shared/window-title';
 import WorktreeNameDialog from './components/WorktreeNameDialog';
 import WorktreeManagerDialog from './components/WorktreeManagerDialog';
 import WorktreeCloseDialog from './components/WorktreeCloseDialog';
+import HookManagerDialog from './components/HookManagerDialog';
 
 type AppState = 'startup' | 'running';
 
@@ -24,6 +25,7 @@ export default function App() {
     status: 'inactive', tunnelUrl: null, token: null, error: null,
   });
   const [branch, setBranch] = useState<string | null>(null);
+  const [showHookManager, setShowHookManager] = useState(false);
   const [worktreeCloseConfirm, setWorktreeCloseConfirm] = useState<{
     tabId: string; worktreeName: string; clean: boolean; changesCount: number;
   } | null>(null);
@@ -345,6 +347,7 @@ export default function App() {
         onReorderTabs={handleReorderTabs}
         worktreeCount={worktreeCount}
         onManageWorktrees={() => setShowWorktreeManager(true)}
+        onManageHooks={() => setShowHookManager(true)}
         remoteInfo={remoteInfo}
         onActivateRemote={handleActivateRemote}
         onDeactivateRemote={handleDeactivateRemote}
@@ -391,6 +394,9 @@ export default function App() {
           }}
           onCancel={() => setWorktreeCloseConfirm(null)}
         />
+      )}
+      {showHookManager && (
+        <HookManagerDialog onClose={() => setShowHookManager(false)} />
       )}
     </div>
   );
