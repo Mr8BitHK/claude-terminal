@@ -324,7 +324,8 @@ function registerIpcHandlers() {
 
   // ---- Tabs ----
   ipcMain.handle('tab:create', async (_event, worktree: string | null, resumeSessionId?: string, savedName?: string) => {
-    const cwd = worktree ?? workspaceDir!;
+    if (!workspaceDir) throw new Error('Session not started');
+    const cwd = worktree ?? workspaceDir;
     const tab = tabManager.createTab(cwd, worktree, savedName);
 
     // If restoring with a saved name, pre-create the naming flag so the
@@ -357,7 +358,7 @@ function registerIpcHandlers() {
     tab.pid = proc.pid;
 
     // Add workspace to recent dirs now that a tab is actually running.
-    settings.addRecentDir(workspaceDir!);
+    settings.addRecentDir(workspaceDir);
 
     // Forward PTY output to the renderer.
     proc.onData((data: string) => {
