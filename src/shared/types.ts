@@ -33,13 +33,6 @@ export interface AppSettings {
 
 export const PIPE_NAME = '\\\\.\\pipe\\claude-terminal';
 
-export const STATUS_INDICATORS: Record<TabStatus, string> = {
-  new: '●',
-  working: '◉',
-  requires_response: '◈',
-  idle: '○',
-};
-
 export const PERMISSION_FLAGS: Record<PermissionMode, string[]> = {
   default: [],
   plan: ['--plan'],
