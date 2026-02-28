@@ -31,8 +31,6 @@ export interface AppSettings {
   lastPermissionMode: PermissionMode;
 }
 
-export const PIPE_NAME = '\\\\.\\pipe\\claude-terminal';
-
 export const PERMISSION_FLAGS: Record<PermissionMode, string[]> = {
   default: [],
   plan: ['--plan'],

@@ -11,7 +11,7 @@ import { WorktreeManager } from './worktree-manager';
 import { HookIpcServer } from './ipc-server';
 import { HookInstaller } from './hook-installer';
 import { SettingsStore } from './settings-store';
-import { PIPE_NAME, PERMISSION_FLAGS, IpcMessage } from '@shared/types';
+import { PERMISSION_FLAGS, IpcMessage } from '@shared/types';
 import type { PermissionMode } from '@shared/types';
 import { log } from './logger';
 
@@ -26,6 +26,7 @@ if (handleSquirrelEvent(app)) {
 const tabManager = new TabManager();
 const ptyManager = new PtyManager();
 const settings = new SettingsStore();
+const PIPE_NAME = `\\\\.\\pipe\\claude-terminal-${process.pid}`;
 const ipcServer = new HookIpcServer(PIPE_NAME);
 
 let worktreeManager: WorktreeManager | null = null;
