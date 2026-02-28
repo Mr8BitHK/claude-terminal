@@ -180,3 +180,42 @@ body {
 .hamburger-item:hover:not(:disabled) { background: #2a2d2e; }
 .hamburger-item:disabled { color: #555; cursor: default; }
 .hamburger-item-hint { margin-left: auto; font-size: 11px; color: #555; }
+
+/* Worktree manager dialog */
+.wt-dialog { min-width: 480px; max-width: 600px; }
+.wt-empty { color: #808080; font-size: 13px; padding: 16px 0; }
+
+.wt-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.wt-table th {
+  text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.6px; color: #808080; padding: 6px 8px;
+  border-bottom: 1px solid #3c3c3c;
+}
+.wt-table td { padding: 8px; font-size: 13px; border-bottom: 1px solid #2a2d2e; }
+.wt-name { font-family: 'Cascadia Code', monospace; }
+.wt-changes { text-align: center; }
+
+.wt-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500;
+}
+.wt-badge-clean { background: #1e3a1e; color: #6a9955; }
+.wt-badge-dirty { background: #3a3a1e; color: #dcdcaa; }
+
+.wt-action { text-align: right; white-space: nowrap; }
+.wt-delete-btn {
+  background: none; border: none; color: #808080; cursor: pointer; padding: 4px;
+}
+.wt-delete-btn:hover { color: #f44747; }
+
+.wt-confirm { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.wt-confirm-text { color: #dcdcaa; }
+.wt-confirm-yes {
+  padding: 2px 8px; border: none; border-radius: 3px;
+  background: #f44747; color: #fff; font-size: 11px; cursor: pointer;
+}
+.wt-confirm-yes:hover { background: #d73a3a; }
+.wt-confirm-no {
+  padding: 2px 8px; border: 1px solid #555; border-radius: 3px;
+  background: none; color: #d4d4d4; font-size: 11px; cursor: pointer;
+}
+.wt-confirm-no:hover { background: #2a2d2e; }
