@@ -21,22 +21,6 @@ if (handleSquirrelEvent(app)) {
 }
 
 // ---------------------------------------------------------------------------
-// Single-instance lock — prevent duplicate app windows
-// ---------------------------------------------------------------------------
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    // Focus the existing window instead of allowing a second one
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Singletons
 // ---------------------------------------------------------------------------
 const tabManager = new TabManager();
