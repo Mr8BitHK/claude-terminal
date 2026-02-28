@@ -143,12 +143,12 @@ export default function TabBar({
           </div>
         )}
       </div>
-      <HamburgerMenu worktreeCount={worktreeCount} onManageWorktrees={onManageWorktrees} />
       <RemoteAccessButton
         remoteInfo={remoteInfo}
         onActivate={onActivateRemote}
         onDeactivate={onDeactivateRemote}
       />
+      <HamburgerMenu worktreeCount={worktreeCount} onManageWorktrees={onManageWorktrees} />
     </div>
   );
 }
