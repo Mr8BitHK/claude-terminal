@@ -82,7 +82,17 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   );
 
   ipcMain.handle('session:getSavedTabs', async (_event, dir: string) => {
-    return settings.getSessions(dir);
+    const saved = settings.getSessions(dir);
+    // Filter out worktree tabs whose directories no longer exist
+    return saved.filter(tab => {
+      if (!tab.worktree) return true;
+      const worktreeCwd = path.join(dir, '.claude', 'worktrees', tab.worktree);
+      const exists = fs.existsSync(worktreeCwd);
+      if (!exists) {
+        log.info('[sessions] skipping saved worktree tab — directory no longer exists:', tab.worktree);
+      }
+      return exists;
+    });
   });
 
   // ---- Tabs ----
@@ -91,6 +101,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     const cwd = worktreeName
       ? path.join(state.workspaceDir, '.claude', 'worktrees', worktreeName)
       : state.workspaceDir;
+    if (worktreeName && !fs.existsSync(cwd)) {
+      throw new Error(`Worktree directory no longer exists: ${worktreeName}`);
+    }
     const tab = tabManager.createTab(cwd, worktreeName, 'claude', savedName);
 
     if (savedName) {
@@ -105,6 +118,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     const args: string[] = [...(PERMISSION_FLAGS[state.permissionMode] ?? [])];
     if (resumeSessionId) {
       args.push('--resume', resumeSessionId);
+      log.info('[tab:create] resuming session', resumeSessionId, 'in cwd:', cwd);
     }
 
     const extraEnv: Record<string, string> = {
@@ -148,11 +162,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     return tab;
   });
 
-  ipcMain.handle('tab:createShell', async (_event, shellType: 'powershell' | 'wsl', afterTabId?: string) => {
+  ipcMain.handle('tab:createShell', async (_event, shellType: 'powershell' | 'wsl', afterTabId?: string, explicitCwd?: string) => {
     if (!state.workspaceDir) throw new Error('Session not started');
 
-    let cwd = state.workspaceDir;
-    if (afterTabId) {
+    let cwd = explicitCwd || state.workspaceDir;
+    if (!explicitCwd && afterTabId) {
       const parentTab = tabManager.getTab(afterTabId);
       if (parentTab) {
         cwd = parentTab.cwd;

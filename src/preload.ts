@@ -5,8 +5,8 @@ const api = {
   // Tab operations
   createTab: (worktree: string | null, resumeSessionId?: string, savedName?: string): Promise<Tab> =>
     ipcRenderer.invoke('tab:create', worktree, resumeSessionId, savedName),
-  createShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string): Promise<Tab> =>
-    ipcRenderer.invoke('tab:createShell', shellType, afterTabId),
+  createShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string, cwd?: string): Promise<Tab> =>
+    ipcRenderer.invoke('tab:createShell', shellType, afterTabId, cwd),
   closeTab: (tabId: string, removeWorktree?: boolean): Promise<void> =>
     ipcRenderer.invoke('tab:close', tabId, removeWorktree),
   switchTab: (tabId: string): Promise<void> =>

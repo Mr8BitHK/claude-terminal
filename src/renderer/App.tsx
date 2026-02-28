@@ -104,9 +104,13 @@ export default function App() {
       const savedTabs = await window.claudeTerminal.getSavedTabs(cliDir);
       for (const saved of savedTabs) {
         if (cancelled) return;
-        const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name);
-        if (cancelled) return;
-        setActiveTabId(tab.id);
+        try {
+          const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name);
+          if (cancelled) return;
+          setActiveTabId(tab.id);
+        } catch {
+          // Worktree may have been removed — skip this tab
+        }
       }
 
       const allTabs = await window.claudeTerminal.getTabs();
@@ -294,8 +298,12 @@ export default function App() {
     if (savedTabs.length > 0) {
       // Restore saved tabs with --resume
       for (const saved of savedTabs) {
-        const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name);
-        setActiveTabId(tab.id);
+        try {
+          const tab = await window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name);
+          setActiveTabId(tab.id);
+        } catch {
+          // Worktree may have been removed — skip this tab
+        }
       }
     }
 
@@ -359,7 +367,18 @@ export default function App() {
         />
       )}
       {showWorktreeManager && (
-        <WorktreeManagerDialog onClose={() => setShowWorktreeManager(false)} />
+        <WorktreeManagerDialog
+          tabs={tabs}
+          onClose={() => setShowWorktreeManager(false)}
+          onOpenClaude={async (worktreeName) => {
+            const tab = await window.claudeTerminal.createTab(worktreeName);
+            setActiveTabId(tab.id);
+          }}
+          onOpenShell={async (shellType, cwd) => {
+            const tab = await window.claudeTerminal.createShellTab(shellType, undefined, cwd);
+            setActiveTabId(tab.id);
+          }}
+        />
       )}
       {worktreeCloseConfirm && (
         <WorktreeCloseDialog

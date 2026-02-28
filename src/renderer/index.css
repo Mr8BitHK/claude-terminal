@@ -244,7 +244,7 @@ body {
 .remote-access-action.remote-deactivate:hover { background: #4a4a4a; }
 
 /* Worktree manager dialog */
-.wt-dialog { min-width: 480px; max-width: 600px; }
+.wt-dialog { min-width: 540px; max-width: 680px; }
 .wt-empty { color: #808080; font-size: 13px; padding: 16px 0; }
 
 .wt-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
@@ -263,7 +263,23 @@ body {
 .wt-badge-clean { background: #1e3a1e; color: #6a9955; }
 .wt-badge-dirty { background: #3a3a1e; color: #dcdcaa; }
 
+.wt-open-cell { text-align: center; width: 40px; }
+.wt-open-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #6a9955;
+}
+
 .wt-action { text-align: right; white-space: nowrap; }
+.wt-actions-row { display: inline-flex; align-items: center; gap: 2px; }
+.wt-action-btn {
+  background: none; border: none; color: #808080; cursor: pointer; padding: 4px;
+  border-radius: 3px;
+}
+.wt-action-btn:hover { background: #2a2d2e; }
+.wt-action-claude:hover { color: #dcdcaa; }
+.wt-action-ps:hover { color: #2472c8; }
+.wt-action-wsl:hover { color: #e95420; }
+
 .wt-delete-btn {
   background: none; border: none; color: #808080; cursor: pointer; padding: 4px;
 }
