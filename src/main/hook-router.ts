@@ -42,6 +42,7 @@ export function createHookRouter(deps: HookRouterDeps) {
 
     switch (event) {
       case 'tab:ready': {
+        // data is JSON: { sessionId, source } where source is "startup"|"resume"|"clear"
         let sessionId = '';
         let source = '';
         try {
@@ -49,10 +50,14 @@ export function createHookRouter(deps: HookRouterDeps) {
           sessionId = parsed.sessionId || '';
           source = parsed.source || '';
         } catch {
+          // Legacy fallback: data was just the sessionId string
           sessionId = data ?? '';
         }
         log.info('[tab:ready]', tabId, 'sessionId:', sessionId, 'source:', source);
 
+        // Only reset tab name on /clear (source === "clear").
+        // Don't check tab.sessionId — that also triggers on --resume
+        // (which fires two SessionStart events: "startup" then "resume").
         if (source === 'clear') {
           log.info('[tab:ready] /clear detected for', tabId, '— resetting name');
           deps.tabManager.resetName(tabId);
@@ -86,6 +91,9 @@ export function createHookRouter(deps: HookRouterDeps) {
         break;
 
       case 'tab:closed':
+        // SessionEnd fires on both /clear and real exit. We don't act on it —
+        // proc.onExit() (wired in ipc-handlers.ts) is the definitive signal
+        // for real exits, and /clear is handled by the follow-up tab:ready.
         log.debug('[tab:closed] SessionEnd for', tabId, '(waiting for onExit or tab:ready)');
         return;
 

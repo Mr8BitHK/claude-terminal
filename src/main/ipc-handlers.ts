@@ -42,6 +42,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
       state.permissionMode = mode;
       settings.setPermissionMode(mode);
       state.worktreeManager = new WorktreeManager(dir);
+      // In dev, __dirname is .vite/build/ — go up to project root.
+      // In production, hooks are copied to resources/hooks/ by forge config.
       const projectRoot = app.isPackaged
         ? path.join(process.resourcesPath, 'hooks')
         : path.join(__dirname, '..', '..', 'src', 'hooks');
