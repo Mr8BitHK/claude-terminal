@@ -81,10 +81,17 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
             try {
               const branch = state.worktreeManager?.getCurrentBranch() ?? null;
               deps.sendToRenderer('git:branchChanged', branch);
+              if (branch && state.hookEngine) {
+                state.hookEngine.emit('branch:changed', { contextRoot: dir, from: '', to: branch });
+              }
             } catch { /* not a git repo or git error */ }
           }, 1000);
         });
         gitHeadWatcher.on('error', () => { /* ignore watch errors */ });
+      }
+
+      if (state.hookEngine) {
+        state.hookEngine.emit('app:started', { contextRoot: dir, cwd: dir });
       }
     },
   );
@@ -167,6 +174,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
 
     deps.sendToRenderer('tab:updated', tab);
     deps.persistSessions();
+    if (state.hookEngine) {
+      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: 'claude' });
+    }
     return tab;
   });
 
@@ -218,6 +228,10 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   });
 
   ipcMain.handle('tab:close', async (_event, tabId: string, removeWorktree?: boolean) => {
+    const closingTab = tabManager.getTab(tabId);
+    if (closingTab && state.hookEngine) {
+      state.hookEngine.emit('tab:closed', { contextRoot: closingTab.cwd, tabId, cwd: closingTab.cwd });
+    }
     ptyManager.kill(tabId);
     flowControl.delete(tabId);
     deps.cleanupNamingFlag(tabId);
@@ -272,7 +286,13 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   // ---- Worktree ----
   ipcMain.handle('worktree:create', async (_event, name: string) => {
     if (!state.worktreeManager) throw new Error('Session not started');
-    return state.worktreeManager.create(name);
+    const worktreePath = state.worktreeManager.create(name);
+    // Fire repo hooks (fire-and-forget)
+    if (state.hookEngine) {
+      const branch = state.worktreeManager!.getCurrentBranch();
+      state.hookEngine.emit('worktree:created', { contextRoot: worktreePath, name, path: worktreePath, branch });
+    }
+    return worktreePath;
   });
 
   ipcMain.handle('worktree:currentBranch', async () => {
@@ -288,6 +308,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   ipcMain.handle('worktree:remove', async (_event, worktreePath: string) => {
     if (!state.worktreeManager) throw new Error('Session not started');
     state.worktreeManager.remove(worktreePath);
+    if (state.hookEngine) {
+      state.hookEngine.emit('worktree:removed', { contextRoot: state.workspaceDir!, name: path.basename(worktreePath), path: worktreePath });
+    }
   });
 
   ipcMain.handle('worktree:checkStatus', async (_event, worktreePath: string) => {

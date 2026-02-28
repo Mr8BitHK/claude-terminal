@@ -10,6 +10,7 @@ export interface HookRouterDeps {
   generateTabName: (tabId: string, prompt: string) => void;
   cleanupNamingFlag: (tabId: string) => void;
   getMainWindow: () => { show: () => void; focus: () => void } | null;
+  hookEngine: { emit: (event: string, context: Record<string, string>) => Promise<void> } | null;
 }
 
 export function createHookRouter(deps: HookRouterDeps) {
@@ -69,6 +70,9 @@ export function createHookRouter(deps: HookRouterDeps) {
           deps.tabManager.setSessionId(tabId, sessionId);
         }
         deps.persistSessions();
+        if (deps.hookEngine && sessionId) {
+          deps.hookEngine.emit('session:started' as any, { contextRoot: tab.cwd, tabId, sessionId });
+        }
         break;
       }
 

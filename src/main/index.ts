@@ -163,6 +163,7 @@ const { handleHookMessage } = createHookRouter({
   tabManager, sendToRenderer, persistSessions,
   generateTabName, cleanupNamingFlag,
   getMainWindow: () => state.mainWindow as BrowserWindow | null,
+  hookEngine: { emit: (event: any, context: any) => state.hookEngine?.emit(event, context) ?? Promise.resolve() } as any,
 });
 
 // ---------------------------------------------------------------------------
