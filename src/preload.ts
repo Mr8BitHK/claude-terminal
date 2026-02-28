@@ -1,10 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PermissionMode, Tab, SavedTab } from './shared/types';
+import type { PermissionMode, Tab, TabType, SavedTab } from './shared/types';
 
 const api = {
   // Tab operations
   createTab: (worktree: string | null, resumeSessionId?: string, savedName?: string): Promise<Tab> =>
     ipcRenderer.invoke('tab:create', worktree, resumeSessionId, savedName),
+  createShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string): Promise<Tab> =>
+    ipcRenderer.invoke('tab:createShell', shellType, afterTabId),
   closeTab: (tabId: string): Promise<void> =>
     ipcRenderer.invoke('tab:close', tabId),
   switchTab: (tabId: string): Promise<void> =>

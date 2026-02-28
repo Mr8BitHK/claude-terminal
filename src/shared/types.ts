@@ -1,9 +1,12 @@
-export type TabStatus = 'new' | 'working' | 'idle' | 'requires_response';
+export type TabStatus = 'new' | 'working' | 'idle' | 'requires_response' | 'shell';
+
+export type TabType = 'claude' | 'powershell' | 'wsl';
 
 export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions';
 
 export interface Tab {
   id: string;
+  type: TabType;
   name: string;
   defaultName: string;
   status: TabStatus;

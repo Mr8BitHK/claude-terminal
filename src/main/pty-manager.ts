@@ -37,6 +37,29 @@ export class PtyManager {
     return proc;
   }
 
+  spawnShell(
+    tabId: string,
+    cwd: string,
+    shellType: 'powershell' | 'wsl',
+  ): pty.IPty {
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([, v]) => v !== undefined),
+    ) as Record<string, string>;
+
+    const shell = shellType === 'powershell' ? 'powershell.exe' : 'wsl.exe';
+
+    const proc = pty.spawn(shell, [], {
+      name: 'xterm-256color',
+      cols: 120,
+      rows: 40,
+      cwd,
+      env,
+    });
+
+    this.ptys.set(tabId, { process: proc, tabId });
+    return proc;
+  }
+
   write(tabId: string, data: string): void {
     this.ptys.get(tabId)?.process.write(data);
   }

@@ -1,4 +1,4 @@
-import { Tab, TabStatus } from '@shared/types';
+import { Tab, TabStatus, TabType } from '@shared/types';
 
 function generateId(): string {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -9,16 +9,41 @@ export class TabManager {
   private activeTabId: string | null = null;
   private nextTabNum = 1;
 
-  createTab(cwd: string, worktree: string | null, savedName?: string): Tab {
+  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string): Tab {
     const id = generateId();
-    const defaultName = worktree ?? `Tab ${this.nextTabNum++}`;
+    let defaultName: string;
+    if (type === 'powershell') {
+      defaultName = 'PowerShell';
+    } else if (type === 'wsl') {
+      defaultName = 'WSL';
+    } else {
+      defaultName = worktree ?? `Tab ${this.nextTabNum++}`;
+    }
     const name = savedName ?? defaultName;
-    const tab: Tab = { id, name, defaultName, status: 'new', worktree, cwd, pid: null, sessionId: null };
+    const status: TabStatus = type === 'claude' ? 'new' : 'shell';
+    const tab: Tab = { id, type, name, defaultName, status, worktree, cwd, pid: null, sessionId: null };
     this.tabs.set(id, tab);
     if (!this.activeTabId) {
       this.activeTabId = id;
     }
     return tab;
+  }
+
+  insertTabAfter(afterTabId: string, tab: Tab): void {
+    // Rebuild the Map to maintain insertion order (Map preserves insertion order in JS)
+    const entries = Array.from(this.tabs.entries());
+    this.tabs.clear();
+    for (const [key, value] of entries) {
+      this.tabs.set(key, value);
+      if (key === afterTabId) {
+        this.tabs.set(tab.id, tab);
+      }
+    }
+    // If afterTabId wasn't found, the tab was already removed from the map
+    // during rebuild, so add it at the end as a fallback
+    if (!this.tabs.has(tab.id)) {
+      this.tabs.set(tab.id, tab);
+    }
   }
 
   getTab(id: string): Tab | undefined {

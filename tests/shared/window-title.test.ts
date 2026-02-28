@@ -3,6 +3,7 @@ import type { Tab } from '@shared/types';
 
 const makeTab = (status: Tab['status']): Tab => ({
   id: `tab-${Math.random()}`,
+  type: 'claude',
   name: 'Tab',
   defaultName: 'Tab',
   status,

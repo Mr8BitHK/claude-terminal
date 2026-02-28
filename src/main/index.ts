@@ -171,7 +171,7 @@ function persistSessions() {
   if (!workspaceDir) return;
   const allTabs = tabManager.getAllTabs();
   const savedTabs = allTabs
-    .filter(t => t.sessionId)
+    .filter(t => t.sessionId && t.type === 'claude')
     .map(t => ({
       name: t.name,
       cwd: t.cwd,
@@ -355,7 +355,7 @@ function registerIpcHandlers() {
     const cwd = worktreeName
       ? path.join(workspaceDir, '.claude', 'worktrees', worktreeName)
       : workspaceDir;
-    const tab = tabManager.createTab(cwd, worktreeName, savedName);
+    const tab = tabManager.createTab(cwd, worktreeName, 'claude', savedName);
 
     // If restoring with a saved name, pre-create the naming flag so the
     // on-prompt-submit hook skips auto-naming for this tab.
@@ -411,6 +411,51 @@ function registerIpcHandlers() {
 
     sendToRenderer('tab:updated', tab);
     persistSessions();
+    return tab;
+  });
+
+  ipcMain.handle('tab:createShell', async (_event, shellType: 'powershell' | 'wsl', afterTabId?: string) => {
+    if (!workspaceDir) throw new Error('Session not started');
+
+    // Determine cwd: use the parent tab's cwd if afterTabId provided, otherwise workspaceDir
+    let cwd = workspaceDir;
+    if (afterTabId) {
+      const parentTab = tabManager.getTab(afterTabId);
+      if (parentTab) {
+        cwd = parentTab.cwd;
+      }
+    }
+
+    const tab = tabManager.createTab(cwd, null, shellType);
+
+    // If afterTabId provided, reposition the tab right after the parent
+    if (afterTabId) {
+      tabManager.removeTab(tab.id);
+      tabManager.insertTabAfter(afterTabId, tab);
+    }
+
+    // Spawn the shell PTY (no hooks, no Claude args)
+    const proc = ptyManager.spawnShell(tab.id, cwd, shellType);
+    tab.pid = proc.pid;
+
+    // Forward PTY output to the renderer
+    proc.onData((data: string) => {
+      sendToRenderer('pty:data', tab.id, data);
+    });
+
+    // When the PTY exits, clean up
+    proc.onExit(() => {
+      if (tabManager.getTab(tab.id)) {
+        tabManager.removeTab(tab.id);
+        sendToRenderer('tab:removed', tab.id);
+        persistSessions();
+      }
+    });
+
+    // Set the new tab as active
+    tabManager.setActiveTab(tab.id);
+
+    sendToRenderer('tab:updated', tab);
     return tab;
   });
 
