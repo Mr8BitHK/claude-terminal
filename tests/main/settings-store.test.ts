@@ -107,7 +107,10 @@ describe('SettingsStore sessions', () => {
   });
 
   it('saveSessions does not throw on bad directory', () => {
-    const badDir = path.join(tmpDir, 'no', 'such', 'deep', 'path');
+    // Create a file where saveSessions expects a directory — forces ENOTDIR
+    const blockingFile = path.join(tmpDir, 'blocker');
+    fs.writeFileSync(blockingFile, '');
+    const badDir = path.join(blockingFile, 'sessions');
     expect(() => store.saveSessions(badDir, [{ name: 'x', cwd: '/', worktree: null, sessionId: 'z' }])).not.toThrow();
   });
 });

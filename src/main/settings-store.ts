@@ -81,7 +81,11 @@ export class SettingsStore {
       log.info('[sessions] loaded', tabs.length, 'saved tabs from', filePath);
       return tabs;
     } catch (err) {
-      log.info('[sessions] no saved sessions at', filePath, String(err));
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        log.info('[sessions] no saved sessions at', filePath);
+      } else {
+        log.warn('[sessions] failed to read sessions from', filePath, String(err));
+      }
       return [];
     }
   }
