@@ -294,9 +294,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
     if (!state.worktreeManager) throw new Error('Session not started');
     const worktreePath = state.worktreeManager.create(name);
     // Fire repo hooks (fire-and-forget)
+    // The worktree branch is named after `name` (see WorktreeManager.create)
     if (state.hookEngine) {
-      const branch = state.worktreeManager!.getCurrentBranch();
-      state.hookEngine.emit('worktree:created', { contextRoot: worktreePath, name, path: worktreePath, branch });
+      state.hookEngine.emit('worktree:created', { contextRoot: worktreePath, name, path: worktreePath, branch: name });
     }
     return worktreePath;
   });
