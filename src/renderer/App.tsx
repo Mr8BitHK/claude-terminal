@@ -225,8 +225,6 @@ export default function App() {
     setActiveTabId(tab.id);
   };
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
-
   if (appState === 'startup') {
     return (
       <div className="app">
@@ -254,7 +252,7 @@ export default function App() {
           />
         ))}
       </div>
-      <StatusBar tab={activeTab} tabCount={tabs.length} />
+      <StatusBar tabs={tabs} />
       {showNewTabDialog && (
         <NewTabDialog
           onCreateWithWorktree={handleNewTabWithWorktree}

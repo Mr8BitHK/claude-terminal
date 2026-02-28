@@ -77,6 +77,8 @@ body {
   background: #007acc; color: #fff; font-size: 12px;
   min-height: 22px; align-items: center;
 }
+.status-counts { display: flex; gap: 12px; align-items: center; }
+.status-count { display: inline-flex; align-items: center; gap: 3px; }
 .status-help { margin-left: auto; }
 
 .dialog-overlay {
