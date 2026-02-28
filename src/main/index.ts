@@ -42,6 +42,7 @@ function parseCliStartDir(): string | null {
   // look like part of the Electron / Forge launcher path.
   for (const arg of process.argv.slice(1)) {
     if (arg.startsWith('-')) continue;
+    if (arg === '.') continue; // Electron Forge passes '.' as the app entry
     if (arg.toLowerCase().includes('electron')) continue;
     // Skip common Forge / Vite dev paths
     if (arg.includes('.vite') || arg.includes('node_modules')) continue;

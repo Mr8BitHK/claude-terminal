@@ -5,11 +5,11 @@ interface StartupDialogProps {
   onStart: (dir: string, mode: PermissionMode) => void;
 }
 
-const PERMISSION_OPTIONS: { value: PermissionMode; label: string; description: string }[] = [
-  { value: 'bypassPermissions', label: 'Bypass Permissions', description: 'Skip all permission prompts' },
-  { value: 'acceptEdits', label: 'Accept Edits', description: 'Auto-approve file edits only' },
-  { value: 'plan', label: 'Plan Mode', description: 'Read-only planning, no file changes' },
-  { value: 'default', label: 'Default', description: 'Ask for permission on each action' },
+const PERMISSION_OPTIONS: { value: PermissionMode; label: string }[] = [
+  { value: 'bypassPermissions', label: 'Bypass' },
+  { value: 'acceptEdits', label: 'Accept Edits' },
+  { value: 'plan', label: 'Plan Mode' },
+  { value: 'default', label: 'Default' },
 ];
 
 export default function StartupDialog({ onStart }: StartupDialogProps) {
@@ -55,10 +55,12 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
   return (
     <div className="dialog-overlay">
       <div className="dialog startup-dialog">
-        <h1>ClaudeTerminal</h1>
+        <div className="startup-header">
+          <h1>Claude Terminal</h1>
+        </div>
 
         <div className="dir-section">
-          <h2>Working Directory</h2>
+          <label className="section-label">Directory</label>
           {recentDirs.length > 0 && (
             <ul className="recent-dirs">
               {recentDirs.map((dir) => (
@@ -79,16 +81,13 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
               ))}
             </ul>
           )}
-          <button className="start-btn" onClick={handleBrowse} style={{ marginTop: 8 }}>
-            Browse...
+          <button className="browse-btn" onClick={handleBrowse}>
+            Browse…
           </button>
-          {selectedDir && (
-            <div className="selected-dir">{selectedDir}</div>
-          )}
         </div>
 
         <div className="permission-section">
-          <h2>Permission Mode</h2>
+          <label className="section-label">Permissions</label>
           {PERMISSION_OPTIONS.map((opt) => (
             <label key={opt.value} className="radio-option">
               <input
@@ -99,22 +98,17 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
                 onChange={() => setPermissionMode(opt.value)}
               />
               {opt.label}
-              <span style={{ color: '#808080', marginLeft: 8, fontSize: 12 }}>
-                {opt.description}
-              </span>
             </label>
           ))}
         </div>
 
-        <div className="dialog-actions">
-          <button
-            className="start-btn"
-            disabled={!selectedDir}
-            onClick={handleStart}
-          >
-            Start
-          </button>
-        </div>
+        <button
+          className="start-btn-primary"
+          disabled={!selectedDir}
+          onClick={handleStart}
+        >
+          Start
+        </button>
       </div>
     </div>
   );

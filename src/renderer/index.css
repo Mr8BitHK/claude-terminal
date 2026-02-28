@@ -90,7 +90,7 @@ body {
   border-radius: 8px; padding: 24px; min-width: 400px; max-width: 500px;
 }
 .dialog h1, .dialog h2 { color: #fff; margin-bottom: 16px; }
-.dialog input {
+.dialog input:not([type="radio"]) {
   width: 100%; padding: 8px; margin-top: 8px;
   background: #3c3c3c; border: 1px solid #555;
   color: #d4d4d4; font-size: 14px; border-radius: 4px;
@@ -104,18 +104,51 @@ body {
 .dialog button:hover, .start-btn:hover { background: #1a8ad4; }
 .dialog button:disabled, .start-btn:disabled { opacity: 0.5; cursor: default; }
 
-.startup-dialog { max-width: 500px; margin: 100px auto; padding: 32px; }
-.recent-dirs { list-style: none; margin: 12px 0; }
-.recent-dirs li { padding: 8px 12px; cursor: pointer; border-radius: 4px; font-family: 'Cascadia Code', monospace; font-size: 13px; display: flex; align-items: center; }
+.startup-dialog { max-width: 480px; padding: 32px 28px 24px; }
+.startup-header { text-align: center; margin-bottom: 28px; }
+.startup-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+
+.section-label {
+  display: block; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.6px; color: #808080; margin-bottom: 8px;
+}
+
+.dir-section { margin-bottom: 20px; }
+.recent-dirs { list-style: none; margin: 0 0 8px; max-height: 160px; overflow-y: auto; }
+.recent-dirs li {
+  padding: 7px 10px; cursor: pointer; border-radius: 4px;
+  font-family: 'Cascadia Code', monospace; font-size: 12px;
+  display: flex; align-items: center; transition: background 0.1s;
+}
 .recent-dirs li:hover { background: #2a2d2e; }
-.recent-dirs li.selected { background: #007acc; color: #fff; }
+.recent-dirs li.selected { background: #264f78; color: #fff; }
 .recent-dirs li .dir-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recent-dirs li .remove-dir-btn { background: none; border: none; color: #808080; cursor: pointer; font-size: 16px; padding: 0 4px; margin-left: 8px; line-height: 1; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+.recent-dirs li .remove-dir-btn {
+  background: none; border: none; color: #808080; cursor: pointer;
+  font-size: 16px; padding: 0 4px; margin-left: 8px; line-height: 1;
+  opacity: 0; transition: opacity 0.15s; flex-shrink: 0;
+}
 .recent-dirs li:hover .remove-dir-btn { opacity: 1; }
 .recent-dirs li .remove-dir-btn:hover { color: #f44747; }
-.radio-option { display: block; padding: 4px 0; cursor: pointer; }
-.radio-option input { margin-right: 8px; }
+
+.browse-btn {
+  padding: 5px 14px; border: 1px solid #555; border-radius: 4px;
+  background: transparent; color: #d4d4d4; font-size: 12px; cursor: pointer;
+}
+.browse-btn:hover { background: #2a2d2e; border-color: #808080; }
+
+.permission-section { margin-bottom: 24px; }
+.radio-option { display: flex; align-items: center; padding: 4px 0; cursor: pointer; font-size: 13px; text-align: left; }
+.radio-option input { margin: 0 8px 0 0; flex-shrink: 0; }
+
+.start-btn-primary {
+  width: 100%; padding: 10px; border: none; border-radius: 6px;
+  background: #007acc; color: #fff; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: background 0.15s;
+}
+.start-btn-primary:hover { background: #1a8ad4; }
+.start-btn-primary:disabled { opacity: 0.4; cursor: default; }
+
 .branch-info { font-size: 12px; color: #808080; margin-top: 8px; }
 .validation-error { font-size: 12px; color: #f44747; margin-top: 4px; }
 .selected-dir { margin-top: 8px; font-family: 'Cascadia Code', monospace; color: #4ec9b0; }
-.dir-section, .permission-section { margin-bottom: 24px; }
