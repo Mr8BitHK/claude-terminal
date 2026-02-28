@@ -1,5 +1,5 @@
 import type { Tab } from '../../shared/types';
-import { STATUS_INDICATORS } from '../../shared/types';
+import TabIndicator from './TabIndicator';
 
 interface StatusBarProps {
   tab: Tab | null;
@@ -12,7 +12,7 @@ export default function StatusBar({ tab, tabCount }: StatusBarProps) {
       {tab ? (
         <>
           <span>
-            {STATUS_INDICATORS[tab.status]} {tab.status}
+            <TabIndicator status={tab.status} /> {tab.status}
           </span>
           {tab.worktree && (
             <span>worktree: {tab.worktree}</span>

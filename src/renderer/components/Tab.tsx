@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Tab as TabType } from '../../shared/types';
-import { STATUS_INDICATORS } from '../../shared/types';
+import TabIndicator from './TabIndicator';
 
 interface TabProps {
   tab: TabType;
@@ -71,7 +71,7 @@ export default function Tab({ tab, isActive, onClick, onClose, onRename }: TabPr
       onClick={onClick}
       onDoubleClick={handleDoubleClick}
     >
-      <span className="tab-indicator">{STATUS_INDICATORS[tab.status]}</span>
+      <TabIndicator status={tab.status} />
       {isRenaming ? (
         <input
           ref={inputRef}
