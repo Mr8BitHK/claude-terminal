@@ -52,7 +52,9 @@ const junkPattern = /\.(map|md|ts)$|^(LICENSE|LICENCE|CHANGELOG|CHANGES|HISTORY|
 
 const config: ForgeConfig = {
   packagerConfig: {
-    executableName: 'claude-terminal',
+    // Linux deb/rpm makers require lowercase executable name matching the package name.
+    // Windows Squirrel requires it to match productName, so only set on Linux.
+    ...(process.platform === 'linux' ? { executableName: 'claude-terminal' } : {}),
     icon: './assets/icon',
     asar: {
       unpack: '{**/node-pty/**/*.node,**/node-pty/**/spawn-helper*,**/node-pty/**/winpty*,**/node-pty/**/conpty*,**/bufferutil/**/*.node,**/utf-8-validate/**/*.node,**/cloudflared/bin/**}',
