@@ -2,7 +2,7 @@ import { app, dialog, ipcMain, shell } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { PermissionMode, RemoteAccessInfo, RepoHookConfig } from '@shared/types';
+import type { PermissionMode, RemoteAccessInfo, RepoHookConfig, Tab } from '@shared/types';
 import { PERMISSION_FLAGS } from '@shared/types';
 import { HookConfigStore } from './hook-config-store';
 import { HookEngine } from './hook-engine';
@@ -44,6 +44,50 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
   // Per-tab flow control state for PTY data buffering
   const MAX_BUFFER_BYTES = 5 * 1024 * 1024; // 5 MB cap per tab
   const flowControl = new Map<string, { paused: boolean; buffer: string[]; bufferBytes: number }>();
+
+  /** Wire a spawned PTY process to a tab: flow control, exit cleanup, activation, hooks. */
+  function wirePtyToTab(
+    proc: { pid: number; onData: (cb: (data: string) => void) => void; onExit: (cb: () => void) => void },
+    tab: Tab,
+    cwd: string,
+    opts?: { alwaysActivate?: boolean },
+  ): void {
+    tab.pid = proc.pid;
+    flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
+
+    proc.onData((data: string) => {
+      const fc = flowControl.get(tab.id);
+      if (fc?.paused) {
+        fc.buffer.push(data);
+        fc.bufferBytes += data.length;
+        while (fc.bufferBytes > MAX_BUFFER_BYTES && fc.buffer.length > 0) {
+          fc.bufferBytes -= fc.buffer.shift()!.length;
+        }
+      } else {
+        deps.sendToRenderer('pty:data', tab.id, data);
+      }
+    });
+
+    proc.onExit(() => {
+      flowControl.delete(tab.id);
+      if (tabManager.getTab(tab.id)) {
+        deps.cleanupNamingFlag(tab.id);
+        tabManager.removeTab(tab.id);
+        deps.sendToRenderer('tab:removed', tab.id);
+        deps.persistSessions();
+      }
+    });
+
+    if (opts?.alwaysActivate || tabManager.getAllTabs().length === 1) {
+      tabManager.setActiveTab(tab.id);
+    }
+
+    deps.sendToRenderer('tab:updated', tab);
+    deps.persistSessions();
+    if (state.hookEngine) {
+      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: tab.type });
+    }
+  }
 
   // Git HEAD watcher — detects branch changes
   let gitHeadWatcher: fs.FSWatcher | null = null;
@@ -152,45 +196,10 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
 
     const spawnCwd = worktreeName ? state.workspaceDir : cwd;
     const proc = ptyManager.spawn(tab.id, spawnCwd, args, extraEnv);
-    tab.pid = proc.pid;
 
     await settings.addRecentDir(state.workspaceDir);
 
-    flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
-
-    proc.onData((data: string) => {
-      const fc = flowControl.get(tab.id);
-      if (fc?.paused) {
-        fc.buffer.push(data);
-        fc.bufferBytes += data.length;
-        // Drop oldest chunks if buffer exceeds cap
-        while (fc.bufferBytes > MAX_BUFFER_BYTES && fc.buffer.length > 0) {
-          fc.bufferBytes -= fc.buffer.shift()!.length;
-        }
-      } else {
-        deps.sendToRenderer('pty:data', tab.id, data);
-      }
-    });
-
-    proc.onExit(() => {
-      flowControl.delete(tab.id);
-      if (tabManager.getTab(tab.id)) {
-        deps.cleanupNamingFlag(tab.id);
-        tabManager.removeTab(tab.id);
-        deps.sendToRenderer('tab:removed', tab.id);
-        deps.persistSessions();
-      }
-    });
-
-    if (tabManager.getAllTabs().length === 1) {
-      tabManager.setActiveTab(tab.id);
-    }
-
-    deps.sendToRenderer('tab:updated', tab);
-    deps.persistSessions();
-    if (state.hookEngine) {
-      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: 'claude' });
-    }
+    wirePtyToTab(proc, tab, cwd);
     return tab;
   });
 
@@ -255,40 +264,10 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
         };
 
         const proc = ptyManager.spawn(tab.id, state.workspaceDir!, args, extraEnv);
-        tab.pid = proc.pid;
 
         await settings.addRecentDir(state.workspaceDir!);
 
-        flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
-
-        proc.onData((data: string) => {
-          const fc = flowControl.get(tab.id);
-          if (fc?.paused) {
-            fc.buffer.push(data);
-          } else {
-            deps.sendToRenderer('pty:data', tab.id, data);
-          }
-        });
-
-        proc.onExit(() => {
-          flowControl.delete(tab.id);
-          if (tabManager.getTab(tab.id)) {
-            deps.cleanupNamingFlag(tab.id);
-            tabManager.removeTab(tab.id);
-            deps.sendToRenderer('tab:removed', tab.id);
-            deps.persistSessions();
-          }
-        });
-
-        if (tabManager.getAllTabs().length === 1) {
-          tabManager.setActiveTab(tab.id);
-        }
-
-        deps.sendToRenderer('tab:updated', tab);
-        deps.persistSessions();
-        if (state.hookEngine) {
-          state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: 'claude' });
-        }
+        wirePtyToTab(proc, tab, cwd);
       } catch (err) {
         sendProgress(`\r\n${RED}✗${RESET} Failed to create worktree\r\n`);
         if (err instanceof Error) {
@@ -330,39 +309,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
     }
 
     const proc = ptyManager.spawnShell(tab.id, cwd, shellType);
-    tab.pid = proc.pid;
 
-    flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
-
-    proc.onData((data: string) => {
-      const fc = flowControl.get(tab.id);
-      if (fc?.paused) {
-        fc.buffer.push(data);
-        fc.bufferBytes += data.length;
-        // Drop oldest chunks if buffer exceeds cap
-        while (fc.bufferBytes > MAX_BUFFER_BYTES && fc.buffer.length > 0) {
-          fc.bufferBytes -= fc.buffer.shift()!.length;
-        }
-      } else {
-        deps.sendToRenderer('pty:data', tab.id, data);
-      }
-    });
-
-    proc.onExit(() => {
-      flowControl.delete(tab.id);
-      if (tabManager.getTab(tab.id)) {
-        tabManager.removeTab(tab.id);
-        deps.sendToRenderer('tab:removed', tab.id);
-        deps.persistSessions();
-      }
-    });
-
-    tabManager.setActiveTab(tab.id);
-
-    deps.sendToRenderer('tab:updated', tab);
-    if (state.hookEngine) {
-      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: shellType });
-    }
+    wirePtyToTab(proc, tab, cwd, { alwaysActivate: true });
     return tab;
   });
 

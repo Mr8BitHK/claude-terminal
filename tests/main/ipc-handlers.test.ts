@@ -263,11 +263,11 @@ describe('registerIpcHandlers', () => {
         'tab:worktreeProgress', 'tab-1', expect.stringContaining('Creating worktree'),
       );
 
-      // Should have spawned Claude PTY
+      // Should have spawned Claude PTY (cwd is workspace root; -w flag points to worktree)
       expect(deps.ptyManager.spawn).toHaveBeenCalledWith(
         'tab-1',
-        expect.stringContaining('my-feature'),
-        expect.any(Array),
+        '/test',
+        expect.arrayContaining(['-w', 'my-feature']),
         expect.any(Object),
       );
     });
