@@ -15,7 +15,7 @@ export default function WorktreeNameDialog({
 
   useEffect(() => {
     window.claudeTerminal.getCurrentBranch().then(setCurrentBranch).catch(() => {
-      setCurrentBranch('unknown');
+      // Not a git repo — leave blank (dialog shouldn't open in this case)
     });
   }, []);
 

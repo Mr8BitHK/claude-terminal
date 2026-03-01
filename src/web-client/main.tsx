@@ -116,6 +116,16 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
   const [activeTabId, setActiveTabId] = useState<string | null>(initialActiveTabId);
   const [termSizes, setTermSizes] = useState(initialTermSizes);
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  const tryShowWorktreeDialog = useCallback(async () => {
+    try {
+      await window.claudeTerminal.getCurrentBranch();
+      setShowWorktreeDialog(true);
+    } catch {
+      setAlertMessage('Cannot create a worktree: this workspace is not a Git repository, or the repository has no commits yet.');
+    }
+  }, []);
 
   const handleNewClaudeTab = useCallback(async () => {
     try {
@@ -254,7 +264,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
         onRenameTab={handleRenameTab}
         onRenameHandled={noop}
         onNewClaudeTab={handleNewClaudeTab}
-        onNewWorktreeTab={() => setShowWorktreeDialog(true)}
+        onNewWorktreeTab={tryShowWorktreeDialog}
         onNewShellTab={noop}
         onReorderTabs={noop}
         onManageWorktrees={noop}
@@ -280,6 +290,17 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
           onCreateWithWorktree={handleNewWorktreeTab}
           onCancel={() => setShowWorktreeDialog(false)}
         />
+      )}
+      {alertMessage && (
+        <div className="dialog-overlay" onKeyDown={(e) => { if (e.key === 'Escape') setAlertMessage(null); }}>
+          <div className="dialog">
+            <h2>Error</h2>
+            <p className="dialog-text">{alertMessage}</p>
+            <div className="dialog-actions">
+              <button autoFocus onClick={() => setAlertMessage(null)}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

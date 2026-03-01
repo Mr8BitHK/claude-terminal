@@ -19,6 +19,7 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
   const [showWorktreeManager, setShowWorktreeManager] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
@@ -100,6 +101,15 @@ export default function App() {
   const handleDeactivateRemote = useCallback(async () => {
     await window.claudeTerminal.deactivateRemoteAccess();
     setRemoteInfo({ status: 'inactive', tunnelUrl: null, token: null, error: null });
+  }, []);
+
+  const tryShowWorktreeDialog = useCallback(async () => {
+    try {
+      await window.claudeTerminal.getCurrentBranch();
+      setShowWorktreeDialog(true);
+    } catch {
+      setAlertMessage('Cannot create a worktree: this workspace is not a Git repository, or the repository has no commits yet.');
+    }
   }, []);
 
   const handleNewTabWithWorktree = useCallback(async (name: string) => {
@@ -268,7 +278,7 @@ export default function App() {
       // Ctrl+W: new worktree tab (prompt for name)
       if (e.ctrlKey && e.key === 'w') {
         e.preventDefault();
-        setShowWorktreeDialog(true);
+        tryShowWorktreeDialog();
         return;
       }
 
@@ -332,7 +342,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [appState, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleCloseTab]);
+  }, [appState, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleCloseTab, tryShowWorktreeDialog]);
 
   const handleStartSession = useCallback(async (dir: string, mode: PermissionMode) => {
     await window.claudeTerminal.startSession(dir, mode);
@@ -386,7 +396,7 @@ export default function App() {
         onRenameTab={handleRenameTab}
         onRenameHandled={() => setRenamingTabId(null)}
         onNewClaudeTab={handleNewTabWithoutWorktree}
-        onNewWorktreeTab={() => setShowWorktreeDialog(true)}
+        onNewWorktreeTab={tryShowWorktreeDialog}
         onNewShellTab={handleNewShellTab}
         onReorderTabs={handleReorderTabs}
         onManageWorktrees={() => setShowWorktreeManager(true)}
@@ -440,6 +450,17 @@ export default function App() {
       )}
       {showHookManager && (
         <HookManagerDialog onClose={() => setShowHookManager(false)} />
+      )}
+      {alertMessage && (
+        <div className="dialog-overlay" onKeyDown={(e) => { if (e.key === 'Escape') setAlertMessage(null); }}>
+          <div className="dialog">
+            <h2>Error</h2>
+            <p className="dialog-text">{alertMessage}</p>
+            <div className="dialog-actions">
+              <button autoFocus onClick={() => setAlertMessage(null)}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
