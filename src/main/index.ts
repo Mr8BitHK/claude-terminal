@@ -31,7 +31,6 @@ let ipcServer: HookIpcServer | null = null;
 const tunnelManager = new TunnelManager();
 let webRemoteServer: WebRemoteServer | null = null;
 let cleanupIpcHandlers: (() => void) | null = null;
-const REMOTE_PORT = 3456;
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -160,8 +159,8 @@ async function activateRemoteAccess(): Promise<RemoteAccessInfo> {
   });
 
   try {
-    await webRemoteServer.start(REMOTE_PORT);
-    await tunnelManager.start(REMOTE_PORT);
+    const localPort = await webRemoteServer.start(0);
+    await tunnelManager.start(localPort);
   } catch (err) {
     log.error('[remote] Failed to activate:', String(err));
     webRemoteServer?.stop();

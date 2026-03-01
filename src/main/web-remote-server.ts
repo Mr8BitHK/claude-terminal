@@ -56,7 +56,8 @@ export class WebRemoteServer {
     return this.token;
   }
 
-  async start(port: number): Promise<void> {
+  /** Start the server. Pass 0 to let the OS pick a free port. Returns the actual port. */
+  async start(port: number): Promise<number> {
     const staticRoot = this.resolveStaticRoot();
 
     this.httpServer = http.createServer((req, res) => {
@@ -69,8 +70,9 @@ export class WebRemoteServer {
     return new Promise((resolve, reject) => {
       this.httpServer!.on('error', reject);
       this.httpServer!.listen(port, '127.0.0.1', () => {
-        log.info(`[web-remote] listening on http://127.0.0.1:${port}`);
-        resolve();
+        const addr = this.httpServer!.address() as import('node:net').AddressInfo;
+        log.info(`[web-remote] listening on http://127.0.0.1:${addr.port}`);
+        resolve(addr.port);
       });
     });
   }
