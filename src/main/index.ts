@@ -276,11 +276,10 @@ app.on('ready', async () => {
   try {
     await ipcServer.start();
     log.info('[ipc-server] listening on pipe');
+    ipcServer.onMessage(handleHookMessage);
   } catch (err) {
     log.error('[ipc-server] FAILED to start:', String(err));
   }
-
-  ipcServer.onMessage(handleHookMessage);
 
   cleanupIpcHandlers = registerIpcHandlers({
     tabManager, ptyManager, settings, state,
