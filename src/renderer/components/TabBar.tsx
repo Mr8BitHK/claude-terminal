@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Tab as TabType, RemoteAccessInfo } from '../../shared/types';
 import Tab from './Tab';
 import HamburgerMenu from './HamburgerMenu';
 import RemoteAccessButton from './RemoteAccessButton';
+import { useClickOutside } from '../hooks/useClickOutside';
 
 interface TabBarProps {
   tabs: TabType[];
@@ -45,16 +46,8 @@ export default function TabBar({
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  useEffect(() => {
-    if (!showNewTabMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowNewTabMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showNewTabMenu]);
+  const closeNewTabMenu = useCallback(() => setShowNewTabMenu(false), []);
+  useClickOutside(menuRef, showNewTabMenu, closeNewTabMenu);
 
   const handleDragStart = useCallback((e: React.DragEvent, tabId: string) => {
     dragTabId.current = tabId;

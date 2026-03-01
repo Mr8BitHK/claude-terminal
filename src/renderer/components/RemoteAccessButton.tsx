@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cloud } from 'lucide-react';
 import type { RemoteAccessInfo } from '../../shared/types';
+import { useClickOutside } from '../hooks/useClickOutside';
 
 interface RemoteAccessButtonProps {
   remoteInfo: RemoteAccessInfo;
@@ -14,17 +15,8 @@ export default function RemoteAccessButton({ remoteInfo, onActivate, onDeactivat
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Outside-click handler — same pattern as HamburgerMenu.tsx
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  const closeMenu = useCallback(() => setOpen(false), []);
+  useClickOutside(menuRef, open, closeMenu);
 
   // Generate QR code when tunnel URL is available and dropdown is open
   useEffect(() => {

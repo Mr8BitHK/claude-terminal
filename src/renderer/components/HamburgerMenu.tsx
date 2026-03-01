@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Menu, GitBranch, Zap } from 'lucide-react';
+import { useClickOutside } from '../hooks/useClickOutside';
 
 interface HamburgerMenuProps {
   onManageWorktrees: () => void;
@@ -10,16 +11,8 @@ export default function HamburgerMenu({ onManageWorktrees, onManageHooks }: Hamb
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  const closeMenu = useCallback(() => setOpen(false), []);
+  useClickOutside(menuRef, open, closeMenu);
 
   return (
     <div className="hamburger-menu" ref={menuRef}>

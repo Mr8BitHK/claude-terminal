@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, SquareTerminal } from 'lucide-react';
 import { penguin } from '@lucide/lab';
 import type { Tab as TabType } from '../../shared/types';
 import TabIndicator from './TabIndicator';
+import { useClickOutside } from '../hooks/useClickOutside';
 
 interface TabProps {
   tab: TabType;
@@ -47,17 +48,8 @@ const Tab = React.memo(function Tab({ tab, index, isActive, onSelect, onClose, o
     return () => window.removeEventListener('tab:startRename', handler);
   }, [tab.id, tab.name]);
 
-  // Outside-click handler for chevron dropdown
-  useEffect(() => {
-    if (!showChevron) return;
-    const handler = (e: MouseEvent) => {
-      if (chevronRef.current && !chevronRef.current.contains(e.target as Node)) {
-        setShowChevron(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showChevron]);
+  const closeChevron = useCallback(() => setShowChevron(false), []);
+  useClickOutside(chevronRef, showChevron, closeChevron);
 
   const commitRename = () => {
     setIsRenaming(false);
