@@ -23,9 +23,14 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
 
   const loadWorktrees = async () => {
     setLoading(true);
-    const details = await window.claudeTerminal.listWorktreeDetails();
-    setWorktrees(details);
-    setLoading(false);
+    try {
+      const details = await window.claudeTerminal.listWorktreeDetails();
+      setWorktrees(details);
+    } catch (err) {
+      console.error('Failed to load worktrees:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadWorktrees(); }, []);
@@ -35,9 +40,14 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
       setConfirmingDelete(wt.path);
       return;
     }
-    await window.claudeTerminal.removeWorktree(wt.path);
-    setConfirmingDelete(null);
-    await loadWorktrees();
+    try {
+      await window.claudeTerminal.removeWorktree(wt.path);
+      setConfirmingDelete(null);
+      await loadWorktrees();
+    } catch (err) {
+      console.error('Failed to delete worktree:', err);
+      setConfirmingDelete(null);
+    }
   };
 
   const isWorktreeOpen = (worktreeName: string) =>
