@@ -14,6 +14,7 @@ import { TunnelManager } from './tunnel-manager';
 import { WebRemoteServer } from './web-remote-server';
 import type { RemoteAccessInfo } from '@shared/types';
 import { log } from './logger';
+import { checkForUpdate, registerUpdateHandlers } from './update-checker';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (handleSquirrelEvent(app)) {
@@ -261,6 +262,7 @@ const createWindow = () => {
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.setTitle(initialTitle);
     log.attach(mainWindow);
+    checkForUpdate(mainWindow);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -322,6 +324,8 @@ app.on('ready', async () => {
   } catch (err) {
     log.error('[ipc-server] FAILED to start:', String(err));
   }
+
+  registerUpdateHandlers();
 
   const ipcResult = registerIpcHandlers({
     tabManager, ptyManager, settings, state,

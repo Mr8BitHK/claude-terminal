@@ -194,8 +194,26 @@ body {
 .hamburger-item:disabled { color: #555; cursor: default; }
 .hamburger-item-hint { margin-left: auto; font-size: 11px; color: #555; }
 
+/* Right side of tab bar */
+.tab-bar-right {
+  display: flex; align-items: center; margin-left: auto;
+  -webkit-app-region: no-drag;
+}
+
+/* Update notification button */
+.update-btn {
+  background: none; border: none; color: #569cd6;
+  cursor: pointer; padding: 4px 8px; display: flex; align-items: center;
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+.update-btn:hover { color: #79b8f8; }
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* Remote access button & dropdown */
-.remote-access-menu { position: relative; margin-left: auto; -webkit-app-region: no-drag; }
+.remote-access-menu { position: relative; }
 
 .remote-access-btn {
   background: none; border: none; color: #555;

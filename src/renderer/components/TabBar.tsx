@@ -3,6 +3,7 @@ import type { Tab as TabType, RemoteAccessInfo } from '../../shared/types';
 import Tab from './Tab';
 import HamburgerMenu from './HamburgerMenu';
 import RemoteAccessButton from './RemoteAccessButton';
+import UpdateButton from './UpdateButton';
 import { useClickOutside } from '../hooks/useClickOutside';
 
 interface TabBarProps {
@@ -153,12 +154,15 @@ export default function TabBar({
           </div>
         )}
       </div>
-      <RemoteAccessButton
-        remoteInfo={remoteInfo}
-        onActivate={onActivateRemote}
-        onDeactivate={onDeactivateRemote}
-      />
-      <HamburgerMenu onManageWorktrees={onManageWorktrees} onManageHooks={onManageHooks} />
+      <div className="tab-bar-right">
+        <UpdateButton />
+        <RemoteAccessButton
+          remoteInfo={remoteInfo}
+          onActivate={onActivateRemote}
+          onDeactivate={onDeactivateRemote}
+        />
+        <HamburgerMenu onManageWorktrees={onManageWorktrees} onManageHooks={onManageHooks} />
+      </div>
     </div>
   );
 }

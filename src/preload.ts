@@ -94,6 +94,18 @@ const api = {
   getRemoteAccessInfo: (): Promise<RemoteAccessInfo> =>
     ipcRenderer.invoke('remote:getInfo'),
 
+  // Update notification
+  getUpdateInfo: (): Promise<{ version: string; url: string } | null> =>
+    ipcRenderer.invoke('app:getUpdateInfo'),
+  onUpdateAvailable: (callback: (info: { version: string; url: string }) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, info: { version: string; url: string }) =>
+      callback(info);
+    ipcRenderer.on('app:updateAvailable', handler);
+    return () => {
+      ipcRenderer.removeListener('app:updateAvailable', handler);
+    };
+  },
+
   // Events from main process
   onPtyData: (callback: (tabId: string, data: string) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, tabId: string, data: string) =>
