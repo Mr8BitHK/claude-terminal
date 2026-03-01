@@ -14,7 +14,10 @@
     "watch": "electron-forge start",
     "build:web": "vite build --config vite.web.config.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "release": "release-it",
+    "release:minor": "release-it minor",
+    "release:major": "release-it major"
   },
   "keywords": [],
   "author": {
