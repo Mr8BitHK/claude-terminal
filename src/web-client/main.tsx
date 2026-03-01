@@ -5,6 +5,7 @@ import { WebSocketBridge } from './ws-bridge';
 import TabBar from '../renderer/components/TabBar';
 import Terminal from '../renderer/components/Terminal';
 import StatusBar from '../renderer/components/StatusBar';
+import WorktreeNameDialog from '../renderer/components/WorktreeNameDialog';
 import { destroyTerminal } from '../renderer/components/terminalCache';
 import '../renderer/index.css';
 import './web-client.css';
@@ -114,6 +115,26 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
   const [tabs, setTabs] = useState<Tab[]>(initialTabs);
   const [activeTabId, setActiveTabId] = useState<string | null>(initialActiveTabId);
   const [termSizes, setTermSizes] = useState(initialTermSizes);
+  const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
+
+  const handleNewClaudeTab = useCallback(async () => {
+    try {
+      const tab = await window.claudeTerminal.createTab(null);
+      setActiveTabId(tab.id);
+    } catch (err) {
+      console.error('Failed to create tab:', err);
+    }
+  }, []);
+
+  const handleNewWorktreeTab = useCallback(async (name: string) => {
+    try {
+      const tab = await window.claudeTerminal.createTabWithWorktree(name);
+      setActiveTabId(tab.id);
+      setShowWorktreeDialog(false);
+    } catch (err) {
+      console.error('Failed to create worktree tab:', err);
+    }
+  }, []);
 
   // Stub remote info — remote access controls don't make sense in the web client
   const remoteInfo: RemoteAccessInfo = {
@@ -232,8 +253,8 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
         onCloseTab={noop}
         onRenameTab={handleRenameTab}
         onRenameHandled={noop}
-        onNewClaudeTab={noop}
-        onNewWorktreeTab={noop}
+        onNewClaudeTab={handleNewClaudeTab}
+        onNewWorktreeTab={() => setShowWorktreeDialog(true)}
         onNewShellTab={noop}
         onReorderTabs={noop}
         onManageWorktrees={noop}
@@ -254,6 +275,12 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
         ))}
       </div>
       <StatusBar tabs={tabs} />
+      {showWorktreeDialog && (
+        <WorktreeNameDialog
+          onCreateWithWorktree={handleNewWorktreeTab}
+          onCancel={() => setShowWorktreeDialog(false)}
+        />
+      )}
     </div>
   );
 }
