@@ -65,9 +65,15 @@ export function createHookRouter(deps: HookRouterDeps) {
           deps.cleanupNamingFlag(tabId);
         }
 
-        deps.tabManager.updateStatus(tabId, 'new');
         if (sessionId) {
           deps.tabManager.setSessionId(tabId, sessionId);
+          // Session has started and CLI is waiting for input → 'idle'.
+          // Using 'new' here would cause the tab to be excluded from
+          // persistence (doPersistSessions filters out status === 'new'),
+          // so a resumed-but-idle session would be lost on next restart.
+          deps.tabManager.updateStatus(tabId, 'idle');
+        } else {
+          deps.tabManager.updateStatus(tabId, 'new');
         }
         deps.persistSessions();
         if (deps.hookEngine && sessionId) {

@@ -62,15 +62,15 @@ describe('hook-router', () => {
   });
 
   describe('tab:ready', () => {
-    it('sets status to new and stores sessionId', () => {
+    it('sets status to idle and stores sessionId', () => {
       const tab = { id: 'tab-1', name: 'Tab 1' };
       (deps.tabManager.getTab as ReturnType<typeof vi.fn>).mockReturnValue(tab);
 
       const data = JSON.stringify({ sessionId: 'sess-abc', source: 'startup' });
       handleHookMessage({ tabId: 'tab-1', event: 'tab:ready', data });
 
-      expect(deps.tabManager.updateStatus).toHaveBeenCalledWith('tab-1', 'new');
       expect(deps.tabManager.setSessionId).toHaveBeenCalledWith('tab-1', 'sess-abc');
+      expect(deps.tabManager.updateStatus).toHaveBeenCalledWith('tab-1', 'idle');
       expect(deps.persistSessions).toHaveBeenCalled();
       expect(deps.sendToRenderer).toHaveBeenCalledWith('tab:updated', tab);
     });
