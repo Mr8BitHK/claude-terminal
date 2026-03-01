@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PermissionMode, Tab, RemoteAccessInfo } from '../shared/types';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
@@ -20,6 +20,11 @@ export default function App() {
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
   const [showWorktreeManager, setShowWorktreeManager] = useState(false);
 
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
+
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [remoteInfo, setRemoteInfo] = useState<RemoteAccessInfo>({
     status: 'inactive', tunnelUrl: null, token: null, error: null,
@@ -36,7 +41,7 @@ export default function App() {
   }, []);
 
   const handleCloseTab = useCallback(async (tabId: string) => {
-    const tab = tabs.find((t) => t.id === tabId);
+    const tab = tabsRef.current.find((t) => t.id === tabId);
     if (tab?.worktree) {
       try {
         const status = await window.claudeTerminal.checkWorktreeStatus(tab.cwd);
@@ -49,7 +54,7 @@ export default function App() {
       }
     }
     await window.claudeTerminal.closeTab(tabId);
-  }, [tabs]);
+  }, []);
 
   const handleRenameTab = useCallback(async (tabId: string, name: string) => {
     await window.claudeTerminal.renameTab(tabId, name);
@@ -204,11 +209,13 @@ export default function App() {
 
 
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — use refs to avoid re-registering on every state change
   useEffect(() => {
+    if (appState !== 'running') return;
+
     const handler = (e: KeyboardEvent) => {
-      // Only handle shortcuts when running
-      if (appState !== 'running') return;
+      const currentTabs = tabsRef.current;
+      const currentActiveId = activeTabIdRef.current;
 
       // Ctrl+T: new tab (no worktree, no dialog)
       if (e.ctrlKey && e.key === 't') {
@@ -241,8 +248,8 @@ export default function App() {
       // Ctrl+F4: close tab
       if (e.ctrlKey && e.key === 'F4') {
         e.preventDefault();
-        if (activeTabId) {
-          handleCloseTab(activeTabId);
+        if (currentActiveId) {
+          handleCloseTab(currentActiveId);
         }
         return;
       }
@@ -250,15 +257,15 @@ export default function App() {
       // Ctrl+Tab / Ctrl+Shift+Tab: switch tabs
       if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault();
-        if (tabs.length <= 1) return;
-        const currentIdx = tabs.findIndex((t) => t.id === activeTabId);
+        if (currentTabs.length <= 1) return;
+        const currentIdx = currentTabs.findIndex((t) => t.id === currentActiveId);
         let nextIdx: number;
         if (e.shiftKey) {
-          nextIdx = currentIdx <= 0 ? tabs.length - 1 : currentIdx - 1;
+          nextIdx = currentIdx <= 0 ? currentTabs.length - 1 : currentIdx - 1;
         } else {
-          nextIdx = currentIdx >= tabs.length - 1 ? 0 : currentIdx + 1;
+          nextIdx = currentIdx >= currentTabs.length - 1 ? 0 : currentIdx + 1;
         }
-        handleSelectTab(tabs[nextIdx].id);
+        handleSelectTab(currentTabs[nextIdx].id);
         return;
       }
 
@@ -266,8 +273,8 @@ export default function App() {
       if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
         e.preventDefault();
         const idx = parseInt(e.key) - 1;
-        if (idx < tabs.length) {
-          handleSelectTab(tabs[idx].id);
+        if (idx < currentTabs.length) {
+          handleSelectTab(currentTabs[idx].id);
         }
         return;
       }
@@ -275,9 +282,9 @@ export default function App() {
       // F2: rename active tab
       if (e.key === 'F2') {
         e.preventDefault();
-        if (activeTabId) {
+        if (currentActiveId) {
           window.dispatchEvent(
-            new CustomEvent('tab:startRename', { detail: { tabId: activeTabId } })
+            new CustomEvent('tab:startRename', { detail: { tabId: currentActiveId } })
           );
         }
         return;
@@ -286,7 +293,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [appState, tabs, activeTabId, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleCloseTab]);
+  }, [appState, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleCloseTab]);
 
   const handleStartSession = async (dir: string, mode: PermissionMode) => {
     await window.claudeTerminal.startSession(dir, mode);
