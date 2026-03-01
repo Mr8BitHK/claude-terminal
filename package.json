@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
-    "make": "npm run build:web && electron-forge make",
+    "make": "pnpm run build:web && electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "watch": "electron-forge start",
