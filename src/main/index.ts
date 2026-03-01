@@ -126,9 +126,8 @@ async function activateRemoteAccess(): Promise<RemoteAccessInfo> {
     serializeTerminal: async (tabId: string): Promise<string> => {
       const win = state.mainWindow as BrowserWindow | null;
       if (!win || win.isDestroyed()) return '';
-      const escaped = tabId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       return win.webContents.executeJavaScript(
-        `window.__serializeTerminal('${escaped}')`,
+        `window.__serializeTerminal(${JSON.stringify(tabId)})`,
       );
     },
   });
