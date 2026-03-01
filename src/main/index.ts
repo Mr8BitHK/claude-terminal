@@ -83,6 +83,8 @@ function sendToRenderer(channel: string, ...args: unknown[]) {
       webRemoteServer.broadcast({ type: 'pty:resized', tabId: args[0], cols: args[1], rows: args[2] });
     } else if (channel === 'tab:switched') {
       webRemoteServer.broadcast({ type: 'tab:switched', tabId: args[0] });
+    } else if (channel === 'tab:worktreeProgress') {
+      webRemoteServer.broadcast({ type: 'tab:worktreeProgress', tabId: args[0], text: args[1] });
     }
   }
 }

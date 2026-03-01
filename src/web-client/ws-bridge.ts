@@ -19,6 +19,7 @@ export class WebSocketBridge {
   private tabRemovedListeners = new Set<TabRemovedCallback>();
   private tabSwitchedListeners = new Set<TabSwitchedCallback>();
   private remoteAccessUpdateListeners = new Set<RemoteAccessUpdateCallback>();
+  private worktreeProgressListeners = new Set<(tabId: string, text: string) => void>();
   private disconnectListeners = new Set<() => void>();
 
   /**
@@ -172,6 +173,14 @@ export class WebSocketBridge {
         }
         break;
 
+      case 'tab:worktreeProgress':
+        if (msg.tabId && typeof msg.text === 'string') {
+          for (const cb of this.worktreeProgressListeners) {
+            cb(msg.tabId, msg.text);
+          }
+        }
+        break;
+
       case 'remote:updated':
         if (msg.info) {
           for (const cb of this.remoteAccessUpdateListeners) {
@@ -272,9 +281,9 @@ export class WebSocketBridge {
       },
 
       // Event listeners
-      onWorktreeProgress: (_callback: (tabId: string, text: string) => void): (() => void) => {
-        // No-op: worktree progress events are not sent over the WebSocket bridge
-        return () => {};
+      onWorktreeProgress: (callback: (tabId: string, text: string) => void): (() => void) => {
+        this.worktreeProgressListeners.add(callback);
+        return () => { this.worktreeProgressListeners.delete(callback); };
       },
 
       onPtyData: (callback: PtyDataCallback): (() => void) => {
