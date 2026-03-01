@@ -86,7 +86,7 @@ export default function App() {
     setRemoteInfo({ status: 'inactive', tunnelUrl: null, token: null, error: null });
   }, []);
 
-  const handleNewTabWithWorktree = async (name: string) => {
+  const handleNewTabWithWorktree = useCallback(async (name: string) => {
     try {
       const tab = await window.claudeTerminal.createTabWithWorktree(name);
       setActiveTabId(tab.id);
@@ -94,7 +94,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to create tab with worktree:', err);
     }
-  };
+  }, []);
 
   // Auto-start when a CLI directory was provided (skip StartupDialog)
   useEffect(() => {
@@ -294,7 +294,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [appState, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleCloseTab]);
 
-  const handleStartSession = async (dir: string, mode: PermissionMode) => {
+  const handleStartSession = useCallback(async (dir: string, mode: PermissionMode) => {
     await window.claudeTerminal.startSession(dir, mode);
     setWorkspaceDir(dir);
 
@@ -325,7 +325,7 @@ export default function App() {
     if (allTabs.length === 0) {
       handleNewTabWithoutWorktree();
     }
-  };
+  }, [handleNewTabWithoutWorktree]);
 
   if (appState === 'startup') {
     return (
