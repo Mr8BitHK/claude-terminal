@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0](https://github.com/Mr8BitHK/claude-terminal/compare/v1.2.4...v1.3.0) (2026-03-01)
+
+### Features
+
+* check for updates on startup and show notification icon ([a5d0a2b](https://github.com/Mr8BitHK/claude-terminal/commit/a5d0a2b504d43c4f6315895c8e2ec17197ff44a4))
+
+### Bug Fixes
+
+* show alert dialog when creating worktree in non-git or empty repo ([d15c3b4](https://github.com/Mr8BitHK/claude-terminal/commit/d15c3b41b299b638d0a2a6bd3c4e806967f819af))
+
 ## [1.2.4](https://github.com/Mr8BitHK/claude-terminal/compare/v1.2.3...v1.2.4) (2026-03-01)
 
 ### Features
