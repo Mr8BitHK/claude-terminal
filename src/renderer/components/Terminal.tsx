@@ -3,6 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { terminalCache, pendingBytes, pausedTabs, pendingWrites } from './terminalCache';
 
@@ -80,11 +81,8 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
   const attachedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || !isVisible) return;
-
-    const container = containerRef.current;
-
-    // Get or create terminal for this tab
+    // Create terminal and register in cache on mount, even for hidden tabs.
+    // This ensures PTY data is buffered by xterm (not dropped) while the tab is hidden.
     let cached = terminalCache.get(tabId);
     if (!cached) {
       const term = new XTerm({
@@ -157,10 +155,14 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
       }
     }
 
-    const { term, fitAddon } = cached;
-
-    // Ensure the global PTY data listener is registered
+    // Ensure the global PTY data listener is registered (even for hidden tabs,
+    // so data is buffered in xterm rather than dropped)
     ensurePtyListener();
+
+    if (!containerRef.current || !isVisible) return;
+
+    const container = containerRef.current;
+    const { term, fitAddon } = cached;
 
     const isFixedSize = fixedCols !== undefined && fixedRows !== undefined;
 
@@ -185,6 +187,24 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
       // Clear container and attach
       container.innerHTML = '';
       term.open(container);
+
+      // Activate WebGL renderer (replaces default DOM renderer)
+      if (!cached.webglAddon) {
+        try {
+          const webglAddon = new WebglAddon();
+          webglAddon.onContextLoss(() => {
+            console.log(`[WebGL:${tabId}] context lost — falling back to DOM`);
+            webglAddon.dispose();
+            cached!.webglAddon = undefined;
+          });
+          term.loadAddon(webglAddon);
+          cached.webglAddon = webglAddon;
+          console.log(`[WebGL:${tabId}] addon loaded OK`);
+        } catch (err) {
+          console.error(`[WebGL:${tabId}] addon load FAILED:`, err);
+          // WebGL unavailable — DOM renderer remains active
+        }
+      }
 
       attachedRef.current = tabId;
     }

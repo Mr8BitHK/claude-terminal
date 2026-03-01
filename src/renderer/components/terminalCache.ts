@@ -1,6 +1,7 @@
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SerializeAddon } from '@xterm/addon-serialize';
+import { WebglAddon } from '@xterm/addon-webgl';
 import type { IDisposable } from '@xterm/xterm';
 
 export interface CachedTerminal {
@@ -8,6 +9,7 @@ export interface CachedTerminal {
   fitAddon: FitAddon;
   serializeAddon: SerializeAddon;
   onDataDisposable?: IDisposable;
+  webglAddon?: WebglAddon;
 }
 
 export const terminalCache = new Map<string, CachedTerminal>();
@@ -22,6 +24,7 @@ export const pausedTabs = new Set<string>();
 export function destroyTerminal(tabId: string): void {
   const cached = terminalCache.get(tabId);
   if (cached) {
+    cached.webglAddon?.dispose();
     cached.onDataDisposable?.dispose();
     cached.term.dispose();
     terminalCache.delete(tabId);
