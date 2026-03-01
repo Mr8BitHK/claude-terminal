@@ -52,6 +52,7 @@ const junkPattern = /\.(map|md|ts)$|^(LICENSE|LICENCE|CHANGELOG|CHANGES|HISTORY|
 
 const config: ForgeConfig = {
   packagerConfig: {
+    executableName: 'claude-terminal',
     icon: './assets/icon',
     asar: {
       unpack: '{**/node-pty/**/*.node,**/node-pty/**/spawn-helper*,**/node-pty/**/winpty*,**/node-pty/**/conpty*,**/bufferutil/**/*.node,**/utf-8-validate/**/*.node,**/cloudflared/bin/**}',
