@@ -1,4 +1,4 @@
-import net from 'net';
+import net from 'node:net';
 import { IpcMessage } from '@shared/types';
 import { log } from './logger';
 

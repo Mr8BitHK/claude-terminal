@@ -1,5 +1,5 @@
-import { execFile, spawn, ExecFileOptions } from 'child_process';
-import path from 'path';
+import { execFile, spawn, ExecFileOptions } from 'node:child_process';
+import path from 'node:path';
 
 function execFileAsync(
   cmd: string,

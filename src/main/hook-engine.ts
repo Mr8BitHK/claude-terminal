@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 import spawn from 'cross-spawn';
 import treeKill from 'tree-kill';
 import type { HookConfigStore } from './hook-config-store';

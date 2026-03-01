@@ -1,6 +1,6 @@
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import { app } from 'electron';
 import { PermissionMode, SavedTab } from '@shared/types';
 import { log } from './logger';
