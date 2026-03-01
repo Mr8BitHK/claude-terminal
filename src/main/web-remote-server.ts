@@ -40,6 +40,8 @@ const MIME_TYPES: Record<string, string> = {
 interface AuthenticatedSocket {
   ws: WebSocket;
   authenticated: boolean;
+  /** True once initial snapshots have been sent; broadcast() waits for this. */
+  synced: boolean;
 }
 
 export class WebRemoteServer {
@@ -100,7 +102,7 @@ export class WebRemoteServer {
   broadcast(msg: object): void {
     const payload = JSON.stringify(msg);
     for (const client of this.clients) {
-      if (client.authenticated && client.ws.readyState === WebSocket.OPEN) {
+      if (client.synced && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(payload);
       }
     }
@@ -173,7 +175,7 @@ export class WebRemoteServer {
   }
 
   private handleWebSocketConnection(ws: WebSocket): void {
-    const client: AuthenticatedSocket = { ws, authenticated: false };
+    const client: AuthenticatedSocket = { ws, authenticated: false, synced: false };
     this.clients.add(client);
 
     log.info('[web-remote] new WebSocket connection');
@@ -243,12 +245,17 @@ export class WebRemoteServer {
       log.info(`[web-remote] sending tabs:sync (${tabs.length} tabs, ${syncPayload.length} bytes)`);
       client.ws.send(syncPayload);
 
-      log.info('[web-remote] client authenticated, sync sent');
-
       // Serialize each terminal's visible buffer and send as pty:data
       // so the client sees the current screen content immediately.
-      this.sendTerminalSnapshots(client, tabs).catch((err) => {
+      // Only after snapshots are sent do we set synced=true so
+      // broadcast() starts forwarding live PTY data to this client.
+      // This prevents live data from interleaving with the snapshot.
+      this.sendTerminalSnapshots(client, tabs).then(() => {
+        client.synced = true;
+        log.info('[web-remote] client synced, snapshots sent');
+      }).catch((err) => {
         log.warn('[web-remote] failed to send terminal snapshots:', String(err));
+        client.synced = true;
       });
     } else {
       client.ws.send(JSON.stringify({ type: 'auth:fail' }));
@@ -279,6 +286,11 @@ export class WebRemoteServer {
           // Mirror to Electron renderer and other web clients
           this.deps.sendToRenderer('tab:switched', msg.tabId);
           this.broadcast({ type: 'tab:switched', tabId: msg.tabId });
+
+          // Re-send the terminal snapshot so the client always has current
+          // content, even if the initial snapshot was missed or the tab was
+          // created after the client connected.
+          this.sendTerminalSnapshots(client, [{ id: msg.tabId }]).catch(() => {});
         }
         break;
 
@@ -325,8 +337,15 @@ export class WebRemoteServer {
         await this.deps.settings.addRecentDir(state.workspaceDir);
         this.deps.wirePtyToTab(proc, tab, cwd);
 
-        // Respond to requesting client so createTab() promise resolves
-        client.ws.send(JSON.stringify({ type: 'tab:created', tab }));
+        // Switch the Electron renderer to the new tab so FitAddon.fit()
+        // runs and resizes the PTY to the actual window dimensions.
+        tabManager.setActiveTab(tab.id);
+        this.deps.sendToRenderer('tab:switched', tab.id);
+
+        // Respond after switching so the PTY has been resized by the
+        // Electron renderer before the mobile client renders.
+        const termSize = ptyManager.getSize(tab.id);
+        client.ws.send(JSON.stringify({ type: 'tab:created', tab, termSize }));
         break;
       }
 
@@ -350,8 +369,15 @@ export class WebRemoteServer {
         this.deps.sendToRenderer('tab:updated', tab);
         this.deps.persistSessions();
 
-        // Respond immediately so createTabWithWorktree() promise resolves
-        client.ws.send(JSON.stringify({ type: 'tab:created', tab }));
+        // Switch Electron to the new tab so FitAddon sizes it correctly
+        tabManager.setActiveTab(tab.id);
+        this.deps.sendToRenderer('tab:switched', tab.id);
+
+        // Respond immediately so createTabWithWorktree() promise resolves.
+        // PTY isn't spawned yet, so use an existing tab's size as a proxy.
+        const existingTabs = tabManager.getAllTabs().filter(t => t.id !== tab.id);
+        const proxySize = existingTabs.length > 0 ? ptyManager.getSize(existingTabs[0].id) : null;
+        client.ws.send(JSON.stringify({ type: 'tab:created', tab, termSize: proxySize }));
 
         const sendProgress = (text: string) => {
           this.deps.sendToRenderer('tab:worktreeProgress', tab.id, text);

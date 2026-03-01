@@ -61,7 +61,7 @@ function createTestClient(server: WebRemoteServer) {
 
   return {
     sendMessage: async (msg: any) => {
-      await (server as any).handleMessage({ ws: mockWs, authenticated: true }, msg);
+      await (server as any).handleMessage({ ws: mockWs, authenticated: true, synced: true }, msg);
     },
     sentMessages,
     mockWs,

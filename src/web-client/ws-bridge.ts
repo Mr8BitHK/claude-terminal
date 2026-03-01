@@ -185,6 +185,17 @@ export class WebSocketBridge {
 
       case 'tab:created':
         if (msg.tab && this.pendingTabCreate) {
+          // Fire tab update + term size BEFORE resolving the promise so that
+          // setTabs, setTermSizes, and setActiveTabId all batch in the same
+          // React render — the Terminal never renders without fixedCols/fixedRows.
+          for (const cb of this.tabUpdateListeners) {
+            cb(msg.tab);
+          }
+          if (msg.termSize) {
+            for (const cb of this.ptyResizedListeners) {
+              cb(msg.tab.id, msg.termSize.cols, msg.termSize.rows);
+            }
+          }
           const pending = this.pendingTabCreate;
           this.pendingTabCreate = null;
           pending.resolve(msg.tab);
