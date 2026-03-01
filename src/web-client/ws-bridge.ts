@@ -21,6 +21,8 @@ export class WebSocketBridge {
   private remoteAccessUpdateListeners = new Set<RemoteAccessUpdateCallback>();
   private worktreeProgressListeners = new Set<(tabId: string, text: string) => void>();
   private disconnectListeners = new Set<() => void>();
+  private pendingTabCreate: { resolve: (tab: Tab) => void; reject: (err: Error) => void } | null = null;
+  private pendingBranchRequest: { resolve: (branch: string) => void } | null = null;
 
   /**
    * Connect to the WebSocket server, authenticate with a token, and wait for
@@ -181,6 +183,22 @@ export class WebSocketBridge {
         }
         break;
 
+      case 'tab:created':
+        if (msg.tab && this.pendingTabCreate) {
+          const pending = this.pendingTabCreate;
+          this.pendingTabCreate = null;
+          pending.resolve(msg.tab);
+        }
+        break;
+
+      case 'worktree:currentBranch':
+        if (this.pendingBranchRequest) {
+          const pending = this.pendingBranchRequest;
+          this.pendingBranchRequest = null;
+          pending.resolve(msg.branch ?? '');
+        }
+        break;
+
       case 'remote:updated':
         if (msg.info) {
           for (const cb of this.remoteAccessUpdateListeners) {
@@ -204,8 +222,17 @@ export class WebSocketBridge {
   get api() {
     return {
       // Tab operations (most are stubs — the server controls tab lifecycle)
-      createTab: async (): Promise<Tab> => {
-        throw new Error('createTab is not available in remote mode');
+      createTab: async (_worktree?: string | null): Promise<Tab> => {
+        return new Promise((resolve, reject) => {
+          this.pendingTabCreate = { resolve, reject };
+          this.send({ type: 'tab:create' });
+        });
+      },
+      createTabWithWorktree: async (name: string): Promise<Tab> => {
+        return new Promise((resolve, reject) => {
+          this.pendingTabCreate = { resolve, reject };
+          this.send({ type: 'tab:createWithWorktree', name });
+        });
       },
       createShellTab: async (): Promise<Tab> => {
         throw new Error('createShellTab is not available in remote mode');
@@ -246,7 +273,12 @@ export class WebSocketBridge {
       createWorktree: async (): Promise<string> => {
         throw new Error('Worktree operations are not available in remote mode');
       },
-      getCurrentBranch: async (): Promise<string> => '',
+      getCurrentBranch: async (): Promise<string> => {
+        return new Promise((resolve) => {
+          this.pendingBranchRequest = { resolve };
+          this.send({ type: 'worktree:currentBranch' });
+        });
+      },
       listWorktreeDetails: async (): Promise<{ name: string; path: string; clean: boolean; changesCount: number }[]> => [],
       removeWorktree: async (): Promise<void> => {},
 
