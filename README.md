@@ -1,5 +1,7 @@
 # Claude Terminal
 
+![Claude Terminal screenshot](docs/screenshot.png)
+
 A Windows desktop app (Electron) that serves as a **tabbed terminal manager for Claude Code sessions**.
 
 Like Windows Terminal, but purpose-built for running multiple Claude Code CLI instances in tabs within one window, with session persistence and keyboard shortcuts.
