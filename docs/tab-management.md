@@ -171,11 +171,16 @@ Each status has a distinct icon in the tab bar and status bar, rendered by `TabI
 | `requires_response` | Speech bubble | Pulsing | `MessageCircle` |
 | `shell` | Terminal icon | None | `SquareTerminal` (powershell) / penguin (wsl) |
 
-The status bar at the bottom of the window aggregates counts across all tabs:
+The status bar at the bottom of the window aggregates counts across all tabs and shows repository hook execution status:
 
 ```
-[spinner] 2  [check] 1  [bubble] 1     Ctrl+T Claude | Ctrl+W Worktree | ...
+[spinner] 2  [check] 1  [bubble] 1   ⟳ Install dependencies...   Ctrl+T Claude | Ctrl+W Worktree | ...
 ```
+
+Hook status is shown between tab counts and keyboard shortcuts:
+- Running: `⟳ hookName...` (yellow)
+- Done: `✓ hookName` (green, auto-dismisses after 3s)
+- Failed: `✗ hookName` (red, persists until next hook runs; hover for error details)
 
 ### Window Title
 
@@ -312,7 +317,7 @@ Tab Name 1, Tab Name 2
 | `src/renderer/components/TabIndicator.tsx` | Status icon rendering per tab status |
 | `src/renderer/components/Terminal.tsx` | xterm.js terminal: PTY data binding, flow control, resize |
 | `src/renderer/components/terminalCache.ts` | Caches xterm.js instances across tab switches to preserve scrollback |
-| `src/renderer/components/StatusBar.tsx` | Bottom bar: aggregated status counts and shortcut hints |
+| `src/renderer/components/StatusBar.tsx` | Bottom bar: aggregated status counts, hook execution status, shortcut hints |
 | `src/shared/claude-cli.ts` | `getClaudeCommand()`: wraps `claude` in `cmd.exe /c` on Windows |
 | `src/shared/window-title.ts` | `buildWindowTitle()`: builds title from workspace, branch, and tab status |
 

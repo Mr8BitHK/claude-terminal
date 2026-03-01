@@ -114,3 +114,9 @@ interface IpcMessage {
 - Newline-delimited JSON parsing
 - Buffered reads (handles partial messages)
 - Graceful shutdown on app exit
+
+## Repository Hooks (separate system)
+
+In addition to Claude Code hooks (described above), ClaudeTerminal has a **repository hook system** for running custom commands on lifecycle events like worktree creation, tab creation, and branch changes. This is configured via `.claude-terminal/hooks.json` in the workspace root and managed through the HookManagerDialog UI.
+
+See `docs/architecture.md` § Repository Hooks for full documentation.

@@ -24,9 +24,10 @@ ClaudeTerminal is an Electron desktop app that manages multiple Claude Code CLI 
 │  │IpcServer  │ │Worktree   │ │HookInstaller  │  │
 │  │named pipe │ │Manager    │ │               │  │
 │  └─────┬─────┘ └───────────┘ └───────────────┘  │
-│  ┌───────────┐                                   │
-│  │  Logger   │ Forwards to DevTools console      │
-│  └───────────┘                                   │
+│  ┌───────────┐ ┌──────────────────────────────┐  │
+│  │  Logger   │ │HookEngine + HookConfigStore  │  │
+│  │           │ │repo hooks (.claude-terminal/) │  │
+│  └───────────┘ └──────────────────────────────┘  │
 └────────┼─────────────────────────────────────────┘
          │ Windows Named Pipe
          │ (\\.\pipe\claude-terminal)
@@ -57,7 +58,7 @@ A React SPA that renders:
 - **StartupDialog**: Directory selection + permission mode on launch
 - **TabBar + Tabs**: Tab strip with status indicators, rename support
 - **Terminal**: xterm.js instances cached per tab, WebGL accelerated
-- **StatusBar**: Active tab status, worktree info, keyboard shortcuts
+- **StatusBar**: Active tab status, hook execution feedback, keyboard shortcuts
 - **NewTabDialog**: Worktree creation prompt
 
 ### Preload (`src/preload.ts`)
@@ -134,6 +135,49 @@ Claude Code supports hooks that fire on specific events. ClaudeTerminal installs
 ### Communication Path
 
 All hooks use `pipe-send.js` which sends JSON via Node.js `net.createConnection` to the Windows named pipe. Environment variables (`CLAUDE_TERMINAL_TAB_ID`, `CLAUDE_TERMINAL_PIPE`) are set on the PTY process to avoid Windows cmd.exe backslash mangling in CLI arguments.
+
+## Repository Hooks
+
+Separate from Claude Code hooks, the repository hook system lets users define custom commands that run on lifecycle events. Configuration lives in `.claude-terminal/hooks.json` in the workspace root.
+
+### Hook Events
+
+| Event | Fires When | Context |
+|-------|-----------|---------|
+| `worktree:created` | After `git worktree add` succeeds | `name`, `path`, `branch` |
+| `worktree:removed` | After `git worktree remove` succeeds | `name`, `path` |
+| `tab:created` | After a new tab is created and PTY spawns | `tabId`, `cwd`, `type` |
+| `tab:closed` | When a tab is closed | `tabId`, `cwd` |
+| `session:started` | When Claude Code session initializes | `tabId`, `sessionId` |
+| `app:started` | When a workspace session starts | `cwd` |
+| `branch:changed` | When `.git/HEAD` changes (debounced 1s) | `from`, `to` |
+
+### Architecture
+
+- **HookConfigStore** (`src/main/hook-config-store.ts`): Reads/writes `.claude-terminal/hooks.json`. Reads fresh from disk on every event (no caching, no file watcher needed).
+- **HookEngine** (`src/main/hook-engine.ts`): Executes matched hook commands via `cross-spawn` with shell mode. Passes context as `HOOK_` prefixed environment variables. Reports status (`running`, `done`, `failed`) via callback.
+- **StatusBar feedback**: Hook execution status is sent to the renderer via `hook:status` IPC events and displayed inline in the StatusBar with auto-dismiss (3s for success, persistent for failures).
+- **HookManagerDialog** (`src/renderer/components/HookManagerDialog.tsx`): GUI for creating, editing, and toggling hooks.
+
+### Configuration Format
+
+```json
+{
+  "hooks": [
+    {
+      "id": "unique-id",
+      "name": "Human-readable name",
+      "event": "worktree:created",
+      "commands": [
+        { "path": ".", "command": "pnpm i" }
+      ],
+      "enabled": true
+    }
+  ]
+}
+```
+
+The `path` field is relative to `contextRoot` (provided by the event). Commands run sequentially; if one fails, remaining commands in that hook are skipped.
 
 ## State Management
 
