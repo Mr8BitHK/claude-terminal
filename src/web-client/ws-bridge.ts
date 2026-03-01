@@ -226,6 +226,12 @@ export class WebSocketBridge {
       resizePty: (tabId: string, cols: number, rows: number): void => {
         this.send({ type: 'pty:resize', tabId, cols, rows });
       },
+      pausePty: (_tabId: string): void => {
+        // No-op: backpressure not applicable over WebSocket bridge
+      },
+      resumePty: (_tabId: string): void => {
+        // No-op: backpressure not applicable over WebSocket bridge
+      },
 
       // Worktree (stubs)
       createWorktree: async (): Promise<string> => {
@@ -260,7 +266,17 @@ export class WebSocketBridge {
         status: 'inactive', tunnelUrl: null, token: null, error: null,
       }),
 
+      // Open external URLs (browser can just use window.open)
+      openExternal: (url: string): void => {
+        window.open(url, '_blank', 'noopener');
+      },
+
       // Event listeners
+      onWorktreeProgress: (_callback: (tabId: string, text: string) => void): (() => void) => {
+        // No-op: worktree progress events are not sent over the WebSocket bridge
+        return () => {};
+      },
+
       onPtyData: (callback: PtyDataCallback): (() => void) => {
         this.ptyDataListeners.add(callback);
         return () => { this.ptyDataListeners.delete(callback); };
