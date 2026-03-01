@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/Mr8BitHK/claude-terminal/compare/v1.2.1...v1.2.2) (2026-03-01)
+
+### Bug Fixes
+
+* add missing API stubs to ws-bridge for remote mobile client ([cd8968e](https://github.com/Mr8BitHK/claude-terminal/commit/cd8968e60a7d65984288a4dc2a79cc08828861e7))
+* install cloudflared to writable userData path with download progress ([af329ed](https://github.com/Mr8BitHK/claude-terminal/commit/af329ed42cdeaf9a53ef8ffdd4b119490e1e44d3))
+* surface tunnel errors in UI with retry instead of stuck connecting ([6f5c4b8](https://github.com/Mr8BitHK/claude-terminal/commit/6f5c4b84a6ca1896522827bbf1bfc250606b10e5))
+
 ## [1.2.1](https://github.com/Mr8BitHK/claude-terminal/compare/v1.2.0...v1.2.1) (2026-03-01)
 
 ### Bug Fixes
