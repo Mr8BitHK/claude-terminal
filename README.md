@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](#download)
 
-![ClaudeTerminal tabs](docs/tabs.png)
+![ClaudeTerminal demo](docs/quickdemo.gif)
 
 A tabbed terminal manager for running multiple **Claude Code** sessions side by side — with session persistence, git worktree integration, and auto-naming.
 
