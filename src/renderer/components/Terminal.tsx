@@ -195,11 +195,10 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
           webglAddon.onContextLoss(() => {
             console.log(`[WebGL:${tabId}] context lost — falling back to DOM`);
             webglAddon.dispose();
-            cached!.webglAddon = undefined;
+            if (cached) cached.webglAddon = undefined;
           });
           term.loadAddon(webglAddon);
           cached.webglAddon = webglAddon;
-          console.log(`[WebGL:${tabId}] addon loaded OK`);
         } catch (err) {
           console.error(`[WebGL:${tabId}] addon load FAILED:`, err);
           // WebGL unavailable — DOM renderer remains active
