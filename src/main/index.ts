@@ -88,7 +88,9 @@ function sendToRenderer(channel: string, ...args: unknown[]) {
   }
 }
 
-async function persistSessions() {
+let persistDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function doPersistSessions() {
   if (!state.workspaceDir) return;
   const allTabs = tabManager.getAllTabs();
   const savedTabs = allTabs
@@ -100,6 +102,22 @@ async function persistSessions() {
       sessionId: t.sessionId!,
     }));
   await settings.saveSessions(state.workspaceDir, savedTabs);
+}
+
+function persistSessions() {
+  if (persistDebounceTimer) clearTimeout(persistDebounceTimer);
+  persistDebounceTimer = setTimeout(() => {
+    persistDebounceTimer = null;
+    doPersistSessions();
+  }, 200);
+}
+
+function flushPersistSessions() {
+  if (persistDebounceTimer) {
+    clearTimeout(persistDebounceTimer);
+    persistDebounceTimer = null;
+  }
+  doPersistSessions();
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +309,7 @@ app.on('ready', async () => {
 
 app.on('window-all-closed', async () => {
   log.info('[quit] workspaceDir:', state.workspaceDir, 'tabs:', tabManager.getAllTabs().length);
-  persistSessions();
+  flushPersistSessions();
 
   for (const tab of tabManager.getAllTabs()) {
     cleanupNamingFlag(tab.id);
