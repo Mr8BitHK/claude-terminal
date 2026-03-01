@@ -69,10 +69,10 @@ function addToPath(appFolder: string): void {
     if (pathEntries.includes(appFolder.toLowerCase())) return;
 
     const newPath = existingPath ? `${existingPath};${appFolder}` : appFolder;
-    execSync(`setx Path "${newPath}"`, { stdio: 'ignore' });
+    setUserPath(newPath);
   } catch {
     try {
-      execSync(`setx Path "${appFolder}"`, { stdio: 'ignore' });
+      setUserPath(appFolder);
     } catch {
       // best-effort
     }
@@ -94,9 +94,34 @@ function removeFromPath(appFolder: string): void {
       .join(';');
 
     if (filtered !== existingPath) {
-      execSync(`setx Path "${filtered}"`, { stdio: 'ignore' });
+      setUserPath(filtered);
     }
   } catch {
     // best-effort
+  }
+}
+
+/**
+ * Write the user PATH environment variable via `reg add` instead of `setx`.
+ * `setx` silently truncates values longer than 1024 characters, which can
+ * corrupt a user's PATH. `reg add` has no such limit.
+ *
+ * After writing, broadcasts WM_SETTINGCHANGE so running processes (Explorer,
+ * terminals) pick up the change without requiring a reboot.
+ */
+function setUserPath(newPath: string): void {
+  execSync(`reg add "HKCU\\Environment" /v Path /t REG_EXPAND_SZ /d "${newPath}" /f`, {
+    stdio: 'ignore',
+  });
+
+  // Broadcast WM_SETTINGCHANGE so Explorer and other processes pick up the
+  // environment change immediately (best-effort, mirrors what setx does).
+  try {
+    execSync(
+      'powershell -NoProfile -Command "Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition \'[DllImport(\\\"user32.dll\\\", SetLastError = true, CharSet = CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);\'; $HWND_BROADCAST = [IntPtr]0xffff; $WM_SETTINGCHANGE = 0x1a; $result = [UIntPtr]::Zero; [Win32.NativeMethods]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, \'Environment\', 2, 5000, [ref]$result)"',
+      { stdio: 'ignore' },
+    );
+  } catch {
+    // best-effort — environment change will take effect on next login
   }
 }
