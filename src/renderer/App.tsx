@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PermissionMode, Tab, RemoteAccessInfo } from '../shared/types';
+import type { PermissionMode, Tab, RemoteAccessInfo, HookExecutionStatus } from '../shared/types';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
@@ -32,6 +32,8 @@ export default function App() {
   const [branch, setBranch] = useState<string | null>(null);
   const [showHookManager, setShowHookManager] = useState(false);
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
+  const [hookStatus, setHookStatus] = useState<{ hookName: string; status: 'running' | 'done' | 'failed'; error?: string } | null>(null);
+  const hookDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [worktreeCloseConfirm, setWorktreeCloseConfirm] = useState<{
     tabId: string; worktreeName: string; clean: boolean; changesCount: number;
   } | null>(null);
@@ -219,12 +221,24 @@ export default function App() {
       setBranch(b);
     });
 
+    const cleanupHookStatus = window.claudeTerminal.onHookStatus((status: HookExecutionStatus) => {
+      if (hookDismissTimer.current) {
+        clearTimeout(hookDismissTimer.current);
+        hookDismissTimer.current = null;
+      }
+      setHookStatus({ hookName: status.hookName, status: status.status, error: status.error ?? status.stderr });
+      if (status.status === 'done') {
+        hookDismissTimer.current = setTimeout(() => setHookStatus(null), 3000);
+      }
+    });
+
     return () => {
       cleanupUpdate();
       cleanupRemoved();
       cleanupRemote();
       cleanupSwitched();
       cleanupBranch();
+      cleanupHookStatus();
     };
   }, []);
 
@@ -390,7 +404,7 @@ export default function App() {
           />
         ))}
       </div>
-      <StatusBar tabs={tabs} />
+      <StatusBar tabs={tabs} hookStatus={hookStatus} />
       {showWorktreeDialog && (
         <WorktreeNameDialog
           onCreateWithWorktree={handleNewTabWithWorktree}

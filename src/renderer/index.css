@@ -88,6 +88,10 @@ body {
 .status-count { display: inline-flex; align-items: center; gap: 3px; }
 .status-bar .tab-indicator { color: inherit; }
 .status-help { margin-left: auto; }
+.hook-status { font-size: 12px; }
+.hook-running { color: #dcdcaa; }
+.hook-done { color: #4ec9b0; }
+.hook-failed { color: #f44747; }
 
 .dialog-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
