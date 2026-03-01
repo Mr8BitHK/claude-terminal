@@ -42,7 +42,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
   const { tabManager, ptyManager, settings, state } = deps;
 
   // Per-tab flow control state for PTY data buffering
-  const flowControl = new Map<string, { paused: boolean; buffer: string[] }>();
+  const MAX_BUFFER_BYTES = 5 * 1024 * 1024; // 5 MB cap per tab
+  const flowControl = new Map<string, { paused: boolean; buffer: string[]; bufferBytes: number }>();
 
   // Git HEAD watcher — detects branch changes
   let gitHeadWatcher: fs.FSWatcher | null = null;
@@ -151,12 +152,17 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
 
     await settings.addRecentDir(state.workspaceDir);
 
-    flowControl.set(tab.id, { paused: false, buffer: [] });
+    flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
 
     proc.onData((data: string) => {
       const fc = flowControl.get(tab.id);
       if (fc?.paused) {
         fc.buffer.push(data);
+        fc.bufferBytes += data.length;
+        // Drop oldest chunks if buffer exceeds cap
+        while (fc.bufferBytes > MAX_BUFFER_BYTES && fc.buffer.length > 0) {
+          fc.bufferBytes -= fc.buffer.shift()!.length;
+        }
       } else {
         deps.sendToRenderer('pty:data', tab.id, data);
       }
@@ -243,7 +249,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
 
         await settings.addRecentDir(state.workspaceDir!);
 
-        flowControl.set(tab.id, { paused: false, buffer: [] });
+        flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
 
         proc.onData((data: string) => {
           const fc = flowControl.get(tab.id);
@@ -313,12 +319,17 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
     const proc = ptyManager.spawnShell(tab.id, cwd, shellType);
     tab.pid = proc.pid;
 
-    flowControl.set(tab.id, { paused: false, buffer: [] });
+    flowControl.set(tab.id, { paused: false, buffer: [], bufferBytes: 0 });
 
     proc.onData((data: string) => {
       const fc = flowControl.get(tab.id);
       if (fc?.paused) {
         fc.buffer.push(data);
+        fc.bufferBytes += data.length;
+        // Drop oldest chunks if buffer exceeds cap
+        while (fc.bufferBytes > MAX_BUFFER_BYTES && fc.buffer.length > 0) {
+          fc.bufferBytes -= fc.buffer.shift()!.length;
+        }
       } else {
         deps.sendToRenderer('pty:data', tab.id, data);
       }
@@ -500,6 +511,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): () => void {
       deps.sendToRenderer('pty:data', tabId, chunk);
     }
     fc.buffer.length = 0;
+    fc.bufferBytes = 0;
   });
 
   // ---- Window title (fire-and-forget) ----
