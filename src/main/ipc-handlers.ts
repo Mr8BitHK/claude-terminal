@@ -496,7 +496,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
 
   // ---- New window ----
   ipcMain.on('window:createNew', () => {
-    spawn(process.execPath, [], { detached: true, stdio: 'ignore' }).unref();
+    // In dev mode, execPath is the bare Electron binary — pass '.' so it
+    // finds the app entry via package.json (parseCliStartDir already skips '.').
+    // In packaged mode, execPath is the .exe which embeds the entry.
+    const args = app.isPackaged ? [] : ['.'];
+    spawn(process.execPath, args, { detached: true, stdio: 'ignore' }).unref();
   });
 
   // ---- Open external URLs ----
