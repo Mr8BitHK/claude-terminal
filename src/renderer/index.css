@@ -30,7 +30,7 @@ body {
   -webkit-app-region: no-drag; user-select: none;
 }
 .tab:hover { background: hsl(var(--instance-hue, 0) 20% 24%); }
-.tab-active { background: hsl(var(--instance-hue, 0) 25% 22%); border-bottom: 2px solid #c9d1d9; }
+.tab-active { background: hsl(var(--instance-hue, 0) 45% 30%); outline: 1px solid #c9d1d9; font-weight: 600; }
 
 .tab-indicator { display: inline-flex; align-items: center; }
 .tab-indicator svg { width: 12px; height: 12px; }
@@ -328,9 +328,9 @@ body {
 .wt-confirm-no:hover { background: #2a2d2e; }
 
 /* Shell tab styling */
-.tab-shell { border-top: 2px solid transparent; }
-.tab-shell-powershell { border-top-color: #2472c8; }
-.tab-shell-wsl { border-top-color: #e95420; }
+.tab-shell { border-top: none; }
+.tab-shell-powershell { }
+.tab-shell-wsl { }
 .tab-status-shell .tab-indicator { color: #569cd6; }
 
 /* Tab chevron dropdown */
