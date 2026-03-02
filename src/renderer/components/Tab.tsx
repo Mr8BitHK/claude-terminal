@@ -3,7 +3,9 @@ import { Icon, SquareTerminal } from 'lucide-react';
 import { penguin } from '@lucide/lab';
 import type { Tab as TabType } from '../../shared/types';
 import TabIndicator from './TabIndicator';
-import { useClickOutside } from '../hooks/useClickOutside';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface TabProps {
   tab: TabType;
@@ -25,10 +27,8 @@ interface TabProps {
 const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenamingProp, onSelect, onClose, onRename, onRenameHandled, onOpenShell, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver }: TabProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(tab.name);
-  const [showChevron, setShowChevron] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
-  const chevronRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isRenaming && inputRef.current) {
@@ -45,9 +45,6 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
       onRenameHandled();
     }
   }, [isRenamingProp, tab.name, onRenameHandled]);
-
-  const closeChevron = useCallback(() => setShowChevron(false), []);
-  useClickOutside(chevronRef, showChevron, closeChevron);
 
   const commitRename = () => {
     setIsRenaming(false);
@@ -75,23 +72,19 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
     onClose(tab.id);
   };
 
-  const handleChevronClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowChevron(!showChevron);
-  };
-
-  const handleOpenShell = (shellType: 'powershell' | 'wsl') => {
-    setShowChevron(false);
+  const handleOpenShell = useCallback((shellType: 'powershell' | 'wsl') => {
     onOpenShell?.(shellType, tab.id);
-  };
-
-  const statusClass = `tab-status-${tab.status}`;
-  const shellClass = tab.type !== 'claude' ? `tab-shell tab-shell-${tab.type}` : '';
+  }, [onOpenShell, tab.id]);
 
   return (
     <div
       ref={tabRef}
-      className={`tab ${isActive ? 'tab-active' : ''} ${statusClass} ${shellClass}${isDragOver ? ' tab-drag-over' : ''}`}
+      className={cn(
+        'flex items-center gap-1.5 px-3 py-1.5 cursor-pointer border-r border-border text-[13px] select-none [-webkit-app-region:no-drag]',
+        isActive && 'bg-[hsl(var(--instance-hue)_45%_30%)] outline outline-1 outline-[#c9d1d9] font-semibold',
+        !isActive && 'hover:bg-[hsl(var(--instance-hue)_20%_24%)]',
+        isDragOver && 'border-l-2 border-l-primary'
+      )}
       onClick={() => onSelect(tab.id)}
       onDoubleClick={handleDoubleClick}
       draggable={!isRenaming}
@@ -103,7 +96,7 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
       {tab.type === 'claude' ? (
         <TabIndicator status={tab.status} />
       ) : (
-        <span className="tab-indicator">
+        <span className="inline-flex items-center [&_svg]:size-3 text-[#569cd6]">
           {tab.type === 'powershell' ? (
             <SquareTerminal size={12} />
           ) : (
@@ -111,35 +104,48 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
           )}
         </span>
       )}
-      <div className="tab-labels">
+      <div className="flex flex-col min-w-0">
         {isRenaming ? (
-          <input
+          <Input
             ref={inputRef}
-            className="tab-rename-input"
+            className="h-6 w-[120px] text-[13px]"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={commitRename}
           />
         ) : (
-          <span className="tab-name">{index < 9 && <span className="tab-number">{index + 1}</span>}{tab.name}</span>
+          <span className="truncate">
+            {index < 9 && <span className="text-muted-foreground mr-1 text-[11px]">{index + 1}</span>}
+            {tab.name}
+          </span>
         )}
         {tab.worktree && (
-          <span className="tab-worktree">{tab.worktree}</span>
+          <span className="text-[10px] text-muted-foreground truncate">{tab.worktree}</span>
         )}
       </div>
       {tab.type === 'claude' && onOpenShell && (
-        <div className="tab-chevron-wrapper" ref={chevronRef}>
-          <button className="tab-chevron" onClick={handleChevronClick} title="Open shell here">&#9662;</button>
-          {showChevron && (
-            <div className="tab-chevron-dropdown">
-              <button className="tab-chevron-item" onClick={() => handleOpenShell('powershell')}>PowerShell here</button>
-              <button className="tab-chevron-item" onClick={() => handleOpenShell('wsl')}>WSL here</button>
-            </div>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="text-muted-foreground hover:text-foreground text-xs px-0.5"
+              onClick={(e) => e.stopPropagation()}
+              title="Open shell here"
+            >
+              &#9662;
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => handleOpenShell('powershell')}>PowerShell here</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenShell('wsl')}>WSL here</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
-      <button className="tab-close" onClick={handleCloseClick} title="Close tab">
+      <button
+        className="text-muted-foreground hover:text-foreground text-base px-0.5"
+        onClick={handleCloseClick}
+        title="Close tab"
+      >
         &times;
       </button>
     </div>

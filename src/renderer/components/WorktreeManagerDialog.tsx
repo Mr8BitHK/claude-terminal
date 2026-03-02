@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Trash2, MessageSquare, SquareTerminal, Monitor } from 'lucide-react';
 import type { Tab } from '../../shared/types';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 interface WorktreeDetail {
   name: string;
@@ -54,85 +58,102 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
     tabs.some((t) => t.worktree === worktreeName);
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog wt-dialog" onClick={(e) => e.stopPropagation()}>
-        <h2>Manage Worktrees</h2>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="min-w-[700px] max-w-[900px]">
+        <DialogHeader>
+          <DialogTitle>Manage Worktrees</DialogTitle>
+        </DialogHeader>
         {loading ? (
-          <p className="wt-empty">Loading...</p>
+          <p className="text-muted-foreground text-sm py-4">Loading...</p>
         ) : worktrees.length === 0 ? (
-          <p className="wt-empty">No worktrees found.</p>
+          <p className="text-muted-foreground text-sm py-4">No worktrees found.</p>
         ) : (
-          <table className="wt-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Changes</th>
-                <th>Open</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Changes</TableHead>
+                <TableHead>Open</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {worktrees.map((wt) => {
                 const open = isWorktreeOpen(wt.name);
                 return (
-                  <tr key={wt.path}>
-                    <td className="wt-name">{wt.name}</td>
-                    <td>
-                      <span className={`wt-badge ${wt.clean ? 'wt-badge-clean' : 'wt-badge-dirty'}`}>
+                  <TableRow key={wt.path}>
+                    <TableCell className="font-medium">{wt.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={wt.clean
+                        ? 'bg-[#1e3a1e] text-success border-0'
+                        : 'bg-[#3a3a1e] text-warning border-0'
+                      }>
                         {wt.clean ? 'clean' : 'dirty'}
-                      </span>
-                    </td>
-                    <td className="wt-changes">{wt.changesCount}</td>
-                    <td className="wt-open-cell">
-                      {open && <span className="wt-open-dot" title="Has open tab" />}
-                    </td>
-                    <td className="wt-action">
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{wt.changesCount}</TableCell>
+                    <TableCell>
+                      {open && <span className="inline-block size-2 rounded-full bg-success" title="Has open tab" />}
+                    </TableCell>
+                    <TableCell>
                       {confirmingDelete === wt.path ? (
-                        <span className="wt-confirm">
-                          <span className="wt-confirm-text">Uncommitted changes. Delete?</span>
-                          <button className="wt-confirm-yes" onClick={() => handleDelete(wt)}>Delete</button>
-                          <button className="wt-confirm-no" onClick={() => setConfirmingDelete(null)}>Cancel</button>
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Uncommitted changes. Delete?</span>
+                          <Button variant="destructive" size="sm" onClick={() => handleDelete(wt)}>Delete</Button>
+                          <Button variant="outline" size="sm" onClick={() => setConfirmingDelete(null)}>Cancel</Button>
+                        </div>
                       ) : (
-                        <span className="wt-actions-row">
-                          <button
-                            className="wt-action-btn wt-action-claude"
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:text-primary"
                             onClick={() => { onOpenClaude(wt.name); onClose(); }}
                             title="Open Claude tab"
                           >
                             <MessageSquare size={14} />
-                          </button>
-                          <button
-                            className="wt-action-btn wt-action-ps"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:text-[#569cd6]"
                             onClick={() => { onOpenShell('powershell', wt.path); onClose(); }}
                             title="Open PowerShell"
                           >
                             <SquareTerminal size={14} />
-                          </button>
-                          <button
-                            className="wt-action-btn wt-action-wsl"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:text-[#e2934b]"
                             onClick={() => { onOpenShell('wsl', wt.path); onClose(); }}
                             title="Open WSL"
                           >
                             <Monitor size={14} />
-                          </button>
-                          <button className="wt-delete-btn" onClick={() => handleDelete(wt)} title="Delete worktree">
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:text-destructive"
+                            onClick={() => handleDelete(wt)}
+                            title="Delete worktree"
+                          >
                             <Trash2 size={14} />
-                          </button>
-                        </span>
+                          </Button>
+                        </div>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
-        <div className="dialog-actions">
-          <button onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

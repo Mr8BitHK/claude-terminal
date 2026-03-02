@@ -8,6 +8,7 @@ ClaudeTerminal is a Windows Terminal-like Electron desktop app for running multi
 
 - **Runtime**: Electron 40 + React 19 + TypeScript 5.7
 - **Terminal**: xterm.js v6 (@xterm scoped) + WebGL addon + node-pty (ConPTY)
+- **UI**: shadcn/ui (new-york style) + Tailwind CSS v4 + Radix UI primitives
 - **Build**: Electron Forge + Vite + pnpm (hoisted node-linker)
 - **Test**: Vitest + jsdom + @testing-library/react
 - **IPC**: Windows named pipes (`\\.\pipe\claude-terminal`)
@@ -26,8 +27,10 @@ src/
     hook-installer.ts   # Writes .claude/settings.local.json for hooks
   renderer/        # React renderer process
     App.tsx        # Root component, state machine (startup/running)
-    components/    # StartupDialog, TabBar, Tab, Terminal, StatusBar, NewTabDialog
-    index.css      # Dark VS Code-like theme
+    globals.css    # Tailwind CSS v4 imports + theme tokens (dark VS Code palette)
+    lib/utils.ts   # cn() utility (clsx + tailwind-merge)
+    components/    # StartupDialog, TabBar, Tab, Terminal, StatusBar, etc.
+    components/ui/ # shadcn/ui primitives (Button, Dialog, DropdownMenu, etc.)
     global.d.ts    # Window.claudeTerminal type augmentation
   shared/
     types.ts       # Shared types: Tab, TabStatus, PermissionMode, IpcMessage
@@ -49,6 +52,7 @@ tests/             # Mirrors src/ structure, 40 tests across 9 files
 - **Electron Forge `app.getAppPath()`**: In dev mode with Vite, returns `.vite/build/`, NOT the project root. Use `__dirname` with relative traversal to find project files (e.g., `path.join(__dirname, '..', '..', 'src', 'hooks')`).
 - **Terminal caching**: xterm.js instances are cached per tabId in a `Map` so switching tabs preserves scrollback.
 - **Preload security**: All renderer-to-main communication goes through `contextBridge`. No `nodeIntegration`, strict `contextIsolation`, `sandbox: true`.
+- **shadcn/ui + Tailwind CSS v4**: All UI styling uses Tailwind utility classes and shadcn component primitives. No hand-rolled CSS (`index.css` deleted). Theme tokens defined as CSS variables in `globals.css`. The `cn()` utility from `@/lib/utils` composes class names. shadcn components live in `src/renderer/components/ui/`.
 
 ## Building and Running
 
@@ -154,7 +158,9 @@ Documentation must stay in sync with code. When implementing or changing a featu
 
 ## Common Patterns
 
-- **Path aliases**: `@shared/*` -> `src/shared/*`, `@main/*` -> `src/main/*` (configured in tsconfig.json, vitest.config.ts, vite.main.config.mjs)
+- **Path aliases**: `@shared/*` -> `src/shared/*`, `@main/*` -> `src/main/*`, `@/*` -> `src/renderer/*` (configured in tsconfig.json, vitest.config.ts, vite configs)
 - **IPC**: `ipcMain.handle` for request/response, `ipcMain.on` for fire-and-forget (PTY write/resize)
 - **Tab status flow**: `new` -> `working` <-> `idle` / `requires_response` (driven by hooks)
 - **Permission modes**: `default`, `plan`, `acceptEdits`, `bypassPermissions` (maps to CLI flags in `PERMISSION_FLAGS`)
+- **shadcn imports**: `import { Button } from '@/components/ui/button'`, `import { cn } from '@/lib/utils'`
+- **Class composition**: Use `cn()` to merge Tailwind classes conditionally: `cn('base-classes', condition && 'conditional-class')`

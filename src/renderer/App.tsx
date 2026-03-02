@@ -11,6 +11,8 @@ import WorktreeNameDialog from './components/WorktreeNameDialog';
 import WorktreeManagerDialog from './components/WorktreeManagerDialog';
 import WorktreeCloseDialog from './components/WorktreeCloseDialog';
 import HookManagerDialog from './components/HookManagerDialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 type AppState = 'startup' | 'running';
 
@@ -338,14 +340,14 @@ export default function App() {
 
   if (appState === 'startup') {
     return (
-      <div className="app">
+      <div className="flex flex-col h-screen border border-[hsl(var(--instance-hue)_40%_25%)]">
         <StartupDialog onStart={handleStartSession} />
       </div>
     );
   }
 
   return (
-    <div className="app">
+    <div className="flex flex-col h-screen border border-[hsl(var(--instance-hue)_40%_25%)]">
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
@@ -364,7 +366,7 @@ export default function App() {
         onActivateRemote={handleActivateRemote}
         onDeactivateRemote={handleDeactivateRemote}
       />
-      <div className="terminal-area">
+      <div className="flex-1 relative overflow-hidden">
         {tabs.map((tab) => (
           <Terminal
             key={tab.id}
@@ -410,17 +412,15 @@ export default function App() {
       {showHookManager && (
         <HookManagerDialog onClose={() => setShowHookManager(false)} />
       )}
-      {alertMessage && (
-        <div className="dialog-overlay" onKeyDown={(e) => { if (e.key === 'Escape') setAlertMessage(null); }}>
-          <div className="dialog">
-            <h2>Error</h2>
-            <p className="dialog-text">{alertMessage}</p>
-            <div className="dialog-actions">
-              <button autoFocus onClick={() => setAlertMessage(null)}>OK</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!alertMessage} onOpenChange={() => setAlertMessage(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Error</DialogTitle></DialogHeader>
+          <DialogDescription>{alertMessage}</DialogDescription>
+          <DialogFooter>
+            <Button autoFocus onClick={() => setAlertMessage(null)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

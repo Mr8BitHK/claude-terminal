@@ -1,3 +1,6 @@
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+
 interface WorktreeCloseDialogProps {
   worktreeName: string;
   clean: boolean;
@@ -13,39 +16,39 @@ export default function WorktreeCloseDialog({
   onConfirm,
   onCancel,
 }: WorktreeCloseDialogProps) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') onCancel();
-  };
-
   return (
-    <div className="dialog-overlay" onKeyDown={handleKeyDown}>
-      <div className="dialog">
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <DialogContent>
         {clean ? (
           <>
-            <h2>Remove worktree?</h2>
-            <p className="dialog-text">
+            <DialogHeader>
+              <DialogTitle>Remove worktree?</DialogTitle>
+            </DialogHeader>
+            <DialogDescription>
               Worktree <strong>{worktreeName}</strong> has no uncommitted changes.
-            </p>
-            <div className="dialog-actions">
-              <button onClick={() => onConfirm(true)} autoFocus>Remove</button>
-              <button onClick={() => onConfirm(false)}>Keep</button>
-            </div>
+            </DialogDescription>
+            <DialogFooter>
+              <Button onClick={() => onConfirm(true)} autoFocus>Remove</Button>
+              <Button variant="secondary" onClick={() => onConfirm(false)}>Keep</Button>
+            </DialogFooter>
           </>
         ) : (
           <>
-            <h2>Uncommitted changes</h2>
-            <p className="dialog-text">
+            <DialogHeader>
+              <DialogTitle>Uncommitted changes</DialogTitle>
+            </DialogHeader>
+            <DialogDescription>
               Worktree <strong>{worktreeName}</strong> has{' '}
               {changesCount} uncommitted change{changesCount !== 1 ? 's' : ''}.
-            </p>
-            <div className="dialog-actions">
-              <button onClick={onCancel} autoFocus>Cancel</button>
-              <button onClick={() => onConfirm(false)}>Keep worktree</button>
-              <button className="dialog-btn-danger" onClick={() => onConfirm(true)}>Remove</button>
-            </div>
+            </DialogDescription>
+            <DialogFooter>
+              <Button variant="secondary" onClick={onCancel} autoFocus>Cancel</Button>
+              <Button variant="secondary" onClick={() => onConfirm(false)}>Keep worktree</Button>
+              <Button variant="destructive" onClick={() => onConfirm(true)}>Remove</Button>
+            </DialogFooter>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

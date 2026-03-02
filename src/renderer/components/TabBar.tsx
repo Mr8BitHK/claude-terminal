@@ -4,7 +4,8 @@ import Tab from './Tab';
 import HamburgerMenu from './HamburgerMenu';
 import RemoteAccessButton from './RemoteAccessButton';
 import UpdateButton from './UpdateButton';
-import { useClickOutside } from '../hooks/useClickOutside';
+import { cn } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface TabBarProps {
   tabs: TabType[];
@@ -43,16 +44,11 @@ export default function TabBar({
   onActivateRemote,
   onDeactivateRemote,
 }: TabBarProps) {
-  const [showNewTabMenu, setShowNewTabMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const dragTabId = useRef<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
-
-  const closeNewTabMenu = useCallback(() => setShowNewTabMenu(false), []);
-  useClickOutside(menuRef, showNewTabMenu, closeNewTabMenu);
 
   const handleDragStart = useCallback((e: React.DragEvent, tabId: string) => {
     dragTabId.current = tabId;
@@ -92,7 +88,10 @@ export default function TabBar({
   }, []);
 
   return (
-    <div className={`tab-bar${isDragging ? ' tab-bar-dragging' : ''}`}>
+    <div className={cn(
+      'flex bg-[hsl(var(--instance-hue)_30%_18%)] border-b border-border min-h-[36px] items-center px-1 [-webkit-app-region:drag]',
+      isDragging && '[-webkit-app-region:no-drag]'
+    )}>
       {tabs.map((tab, index) => (
         <Tab
           key={tab.id}
@@ -112,49 +111,33 @@ export default function TabBar({
           onDragEnd={handleDragEnd}
         />
       ))}
-      <div className="new-tab-menu" ref={menuRef}>
-        <button
-          className="new-tab-btn"
-          onClick={() => setShowNewTabMenu(!showNewTabMenu)}
-          title="New tab"
-        >
-          +
-        </button>
-        {showNewTabMenu && (
-          <div className="new-tab-dropdown">
-            <button
-              className="new-tab-item"
-              onClick={() => { setShowNewTabMenu(false); onNewClaudeTab(); }}
-            >
-              <span>Claude Tab</span>
-              <span className="new-tab-shortcut">Ctrl+T</span>
-            </button>
-            <button
-              className="new-tab-item"
-              onClick={() => { setShowNewTabMenu(false); onNewWorktreeTab(); }}
-            >
-              <span>Claude Worktree</span>
-              <span className="new-tab-shortcut">Ctrl+W</span>
-            </button>
-            <div className="new-tab-separator" />
-            <button
-              className="new-tab-item"
-              onClick={() => { setShowNewTabMenu(false); onNewShellTab('powershell', activeTabId ?? undefined); }}
-            >
-              <span>PowerShell</span>
-              <span className="new-tab-shortcut">Ctrl+P</span>
-            </button>
-            <button
-              className="new-tab-item"
-              onClick={() => { setShowNewTabMenu(false); onNewShellTab('wsl', activeTabId ?? undefined); }}
-            >
-              <span>WSL</span>
-              <span className="new-tab-shortcut">Ctrl+L</span>
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="tab-bar-right">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="text-muted-foreground hover:text-foreground text-xl px-3 py-1 [-webkit-app-region:no-drag]" title="New tab">
+            +
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={onNewClaudeTab}>
+            <span>Claude Tab</span>
+            <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+T</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onNewWorktreeTab}>
+            <span>Claude Worktree</span>
+            <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+W</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onNewShellTab('powershell', activeTabId ?? undefined)}>
+            <span>PowerShell</span>
+            <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+P</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onNewShellTab('wsl', activeTabId ?? undefined)}>
+            <span>WSL</span>
+            <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+L</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <div className="flex items-center ml-auto [-webkit-app-region:no-drag]">
         <UpdateButton />
         <RemoteAccessButton
           remoteInfo={remoteInfo}

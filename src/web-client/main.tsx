@@ -7,7 +7,11 @@ import Terminal from '../renderer/components/Terminal';
 import StatusBar from '../renderer/components/StatusBar';
 import WorktreeNameDialog from '../renderer/components/WorktreeNameDialog';
 import { destroyTerminal } from '../renderer/components/terminalCache';
-import '../renderer/index.css';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import '../renderer/globals.css';
 import './web-client.css';
 
 const bridge = new WebSocketBridge();
@@ -62,18 +66,20 @@ function TokenScreen({ onConnected }: {
   };
 
   return (
-    <div className="app">
-      <div className="dialog-overlay">
-        <div className="dialog startup-dialog">
-          <div className="startup-header">
-            <h1>Claude Terminal Remote</h1>
-          </div>
+    <div className="flex flex-col h-dvh">
+      <Dialog open>
+        <DialogContent className="max-w-[480px]">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-xl">Claude Terminal Remote</DialogTitle>
+          </DialogHeader>
           {connecting ? (
-            <p style={{ color: '#808080', textAlign: 'center' }}>Reconnecting...</p>
+            <p className="text-muted-foreground text-center">Reconnecting...</p>
           ) : (
           <form onSubmit={handleSubmit}>
-            <label className="section-label">Access Code</label>
-            <input
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Access Code
+            </Label>
+            <Input
               type="text"
               autoComplete="off"
               maxLength={6}
@@ -82,22 +88,22 @@ function TokenScreen({ onConnected }: {
               placeholder="ABC123"
               autoFocus
               disabled={connecting}
-              style={{ textAlign: 'center', letterSpacing: '0.3em', fontSize: '1.5em' }}
+              className="text-center tracking-[0.3em] text-2xl"
             />
-            {error && <div className="validation-error">{error}</div>}
-            <div className="dialog-actions" style={{ marginTop: 20 }}>
-              <button
+            {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+            <div className="mt-5">
+              <Button
                 type="submit"
-                className="start-btn-primary"
+                className="w-full"
                 disabled={token.length !== 6 || connecting}
               >
                 Connect
-              </button>
+              </Button>
             </div>
           </form>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -254,7 +260,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
   const noop = () => {};
 
   return (
-    <div className="app">
+    <div className="flex flex-col h-dvh">
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
@@ -273,7 +279,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
         onActivateRemote={noop}
         onDeactivateRemote={noop}
       />
-      <div className="terminal-area">
+      <div className="flex-1 relative overflow-auto [-webkit-overflow-scrolling:touch]">
         {tabs.map((tab) => (
           <Terminal
             key={tab.id}
@@ -291,17 +297,15 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
           onCancel={() => setShowWorktreeDialog(false)}
         />
       )}
-      {alertMessage && (
-        <div className="dialog-overlay" onKeyDown={(e) => { if (e.key === 'Escape') setAlertMessage(null); }}>
-          <div className="dialog">
-            <h2>Error</h2>
-            <p className="dialog-text">{alertMessage}</p>
-            <div className="dialog-actions">
-              <button autoFocus onClick={() => setAlertMessage(null)}>OK</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!alertMessage} onOpenChange={() => setAlertMessage(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Error</DialogTitle></DialogHeader>
+          <DialogDescription>{alertMessage}</DialogDescription>
+          <DialogFooter>
+            <Button autoFocus onClick={() => setAlertMessage(null)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -351,29 +355,29 @@ function DisconnectedScreen({ onReconnected }: {
   }, []);
 
   return (
-    <div className="app">
-      <div className="dialog-overlay">
-        <div className="dialog startup-dialog" style={{ textAlign: 'center' }}>
-          <div className="startup-header">
-            <h1>Disconnected</h1>
-          </div>
+    <div className="flex flex-col h-dvh">
+      <Dialog open>
+        <DialogContent className="max-w-[480px] text-center">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-xl">Disconnected</DialogTitle>
+          </DialogHeader>
           {status === 'reconnecting' ? (
-            <p style={{ color: '#808080', marginBottom: 20 }}>Reconnecting...</p>
+            <p className="text-muted-foreground mb-5">Reconnecting...</p>
           ) : (
             <>
-              <p style={{ color: '#808080', marginBottom: 20 }}>
+              <p className="text-muted-foreground mb-5">
                 Could not reconnect to the remote session.
               </p>
-              <button
-                className="start-btn-primary"
+              <Button
+                className="w-full"
                 onClick={() => window.location.reload()}
               >
                 Try Again
-              </button>
+              </Button>
             </>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

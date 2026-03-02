@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { validateWorktreeName } from '../utils/validate-worktree-name';
 
 interface WorktreeNameDialogProps {
@@ -26,19 +30,16 @@ export default function WorktreeNameDialog({
     if (canSubmit) onCreateWithWorktree(worktreeName.trim());
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  };
-
   return (
-    <div className="dialog-overlay" onKeyDown={handleKeyDown}>
-      <div className="dialog">
-        <h2>Create Worktree Tab</h2>
-        <label>
-          Worktree name:
-          <input
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Worktree Tab</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="worktree-name">Worktree name:</Label>
+          <Input
+            id="worktree-name"
             type="text"
             value={worktreeName}
             onChange={(e) => setWorktreeName(e.target.value)}
@@ -48,25 +49,22 @@ export default function WorktreeNameDialog({
               if (e.key === 'Enter') handleSubmit();
             }}
           />
-        </label>
-        {validationError && (
-          <div className="validation-error">{validationError}</div>
-        )}
-        {currentBranch && (
-          <div className="branch-info">
-            Base branch: {currentBranch}
-          </div>
-        )}
-        <div className="dialog-actions">
-          <button
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-          >
-            Create
-          </button>
-          <button onClick={onCancel}>Cancel</button>
+          {validationError && (
+            <p className="text-xs text-destructive mt-1">{validationError}</p>
+          )}
+          {currentBranch && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Base branch: {currentBranch}
+            </p>
+          )}
         </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button disabled={!canSubmit} onClick={handleSubmit}>
+            Create
+          </Button>
+          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

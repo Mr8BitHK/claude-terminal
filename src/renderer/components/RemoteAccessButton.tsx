@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Cloud, Loader2 } from 'lucide-react';
 import type { RemoteAccessInfo } from '../../shared/types';
-import { useClickOutside } from '../hooks/useClickOutside';
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
 
 interface RemoteAccessButtonProps {
   remoteInfo: RemoteAccessInfo;
@@ -11,13 +13,9 @@ interface RemoteAccessButtonProps {
 
 export default function RemoteAccessButton({ remoteInfo, onActivate, onDeactivate }: RemoteAccessButtonProps) {
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [activating, setActivating] = useState(false);
-
-  const closeMenu = useCallback(() => setOpen(false), []);
-  useClickOutside(menuRef, open, closeMenu);
 
   // Clear activating state once the status progresses
   useEffect(() => {
@@ -56,112 +54,118 @@ export default function RemoteAccessButton({ remoteInfo, onActivate, onDeactivat
     setCopiedField(field);
   };
 
-  const btnClass = [
-    'remote-access-btn',
-    remoteInfo.status === 'active' ? 'remote-active' : '',
-    (remoteInfo.status === 'connecting' || remoteInfo.status === 'installing') ? 'remote-connecting' : '',
-  ].filter(Boolean).join(' ');
-
   const truncate = (s: string, max: number) =>
     s.length > max ? s.slice(0, max) + '\u2026' : s;
 
   return (
-    <div className="remote-access-menu" ref={menuRef}>
-      <button
-        className={btnClass}
-        onClick={() => setOpen(!open)}
-        title="Remote access"
-      >
-        <Cloud size={16} />
-      </button>
-      {open && (
-        <div className="remote-access-dropdown">
-          <div className="remote-access-header">Remote Access</div>
-
-          {remoteInfo.status === 'inactive' && (
-            <>
-              <p className="remote-access-desc">
-                Share a secure tunnel URL so others can connect to this session from a browser.
-              </p>
-              <button
-                className="remote-access-action"
-                disabled={activating}
-                onClick={() => { setActivating(true); onActivate(); }}
-              >
-                {activating ? <><Loader2 size={14} className="spinner" /> Activating...</> : 'Activate'}
-              </button>
-            </>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            'h-7 w-7',
+            remoteInfo.status === 'active' && 'text-success',
+            (remoteInfo.status === 'connecting' || remoteInfo.status === 'installing') && 'text-warning animate-pulse',
+            remoteInfo.status === 'inactive' && 'text-muted-foreground hover:text-foreground',
+            remoteInfo.status === 'error' && 'text-destructive',
           )}
+          title="Remote access"
+        >
+          <Cloud size={16} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[260px] p-3">
+        <h3 className="text-sm font-semibold mb-2">Remote Access</h3>
 
-          {remoteInfo.status === 'installing' && (
-            <div className="remote-access-desc">
-              <p>Installing cloudflared{remoteInfo.progress != null ? ` (${remoteInfo.progress}%)` : ''}...</p>
-              <div className="remote-access-progress-track">
-                <div
-                  className="remote-access-progress-bar"
-                  style={{ width: `${remoteInfo.progress ?? 0}%` }}
-                />
-              </div>
+        {remoteInfo.status === 'inactive' && (
+          <>
+            <p className="text-xs text-muted-foreground mb-2">
+              Share a secure tunnel URL so others can connect to this session from a browser.
+            </p>
+            <Button
+              className="w-full mt-2"
+              disabled={activating}
+              onClick={() => { setActivating(true); onActivate(); }}
+            >
+              {activating ? <><Loader2 size={14} className="animate-spin" /> Activating...</> : 'Activate'}
+            </Button>
+          </>
+        )}
+
+        {remoteInfo.status === 'installing' && (
+          <div className="text-xs text-muted-foreground">
+            <p>Installing cloudflared{remoteInfo.progress != null ? ` (${remoteInfo.progress}%)` : ''}...</p>
+            <div className="h-1 bg-secondary rounded mt-1.5 overflow-hidden">
+              <div
+                className="h-full bg-primary rounded transition-[width]"
+                style={{ width: `${remoteInfo.progress ?? 0}%` }}
+              />
             </div>
-          )}
+          </div>
+        )}
 
-          {remoteInfo.status === 'connecting' && (
-            <p className="remote-access-desc">Connecting tunnel...</p>
-          )}
+        {remoteInfo.status === 'connecting' && (
+          <p className="text-xs text-muted-foreground">Connecting tunnel...</p>
+        )}
 
-          {remoteInfo.status === 'active' && remoteInfo.tunnelUrl && (
-            <>
-              <div className="remote-access-status">&#9679; Connected</div>
+        {remoteInfo.status === 'active' && remoteInfo.tunnelUrl && (
+          <>
+            <div className="text-xs text-success mb-2">&#9679; Connected</div>
 
-              {qrDataUrl && (
-                <div className="remote-access-qr">
-                  <img src={qrDataUrl} alt="QR code" width={180} height={180} />
-                </div>
-              )}
-
-              <div className="remote-access-field">
-                <span className="remote-access-label">URL</span>
-                <span className="remote-access-value">{truncate(remoteInfo.tunnelUrl, 32)}</span>
-                <button
-                  className="remote-access-copy"
-                  onClick={() => copyToClipboard(remoteInfo.tunnelUrl!, 'url')}
-                >
-                  {copiedField === 'url' ? 'Copied!' : 'Copy'}
-                </button>
+            {qrDataUrl && (
+              <div className="flex justify-center mb-2">
+                <img src={qrDataUrl} alt="QR code" width={180} height={180} />
               </div>
+            )}
 
-              {remoteInfo.token && (
-                <div className="remote-access-field">
-                  <span className="remote-access-label">Code</span>
-                  <span className="remote-access-value" style={{ letterSpacing: '0.15em', fontWeight: 600 }}>{remoteInfo.token}</span>
-                  <button
-                    className="remote-access-copy"
-                    onClick={() => copyToClipboard(remoteInfo.token!, 'token')}
-                  >
-                    {copiedField === 'token' ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-              )}
-
-              <button
-                className="remote-access-action remote-deactivate"
-                onClick={() => { onDeactivate(); }}
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-[10px] text-muted-foreground w-8">URL</span>
+              <span className="text-xs flex-1 truncate">{truncate(remoteInfo.tunnelUrl, 32)}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-5 text-[10px] px-1.5"
+                onClick={() => copyToClipboard(remoteInfo.tunnelUrl!, 'url')}
               >
-                Deactivate
-              </button>
-            </>
-          )}
+                {copiedField === 'url' ? 'Copied!' : 'Copy'}
+              </Button>
+            </div>
 
-          {remoteInfo.status === 'error' && (
-            <>
-              <p className="remote-access-error">{remoteInfo.error || 'An error occurred.'}</p>
-              <button className="remote-access-action" onClick={() => { onActivate(); }}>
-                Retry
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+            {remoteInfo.token && (
+              <div className="flex items-center gap-1 mb-2">
+                <span className="text-[10px] text-muted-foreground w-8">Code</span>
+                <span className="text-xs flex-1 tracking-wider font-semibold">{remoteInfo.token}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-5 text-[10px] px-1.5"
+                  onClick={() => copyToClipboard(remoteInfo.token!, 'token')}
+                >
+                  {copiedField === 'token' ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+            )}
+
+            <Button
+              variant="secondary"
+              className="w-full mt-2"
+              onClick={() => { onDeactivate(); }}
+            >
+              Deactivate
+            </Button>
+          </>
+        )}
+
+        {remoteInfo.status === 'error' && (
+          <>
+            <p className="text-xs text-destructive mb-2">{remoteInfo.error || 'An error occurred.'}</p>
+            <Button className="w-full" onClick={() => { onActivate(); }}>
+              Retry
+            </Button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

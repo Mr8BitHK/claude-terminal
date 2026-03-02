@@ -1,48 +1,15 @@
 /* Web client overrides — browser & mobile adaptations */
 
 /* Dynamic viewport height handles mobile browser chrome & virtual keyboard */
-body, .app {
+body {
   height: 100dvh;
 }
 
-/* No Electron drag region in browser */
-.tab-bar {
-  -webkit-app-region: unset;
-  flex-shrink: 0;
-  overflow-x: auto;
-}
-
-/* The new-tab dropdown is clipped by tab-bar overflow. Use fixed positioning
-   so it escapes the scroll container and renders above the tab bar. */
-.new-tab-menu {
-  position: static;
-}
-.new-tab-dropdown {
-  position: fixed;
-  top: 36px;
-  right: 70px;
-  left: auto;
-}
-
-/* Keep status bar pinned at the bottom */
-.status-bar {
-  flex-shrink: 0;
-}
-
-/* Allow scrolling in both directions for narrow/short screens.
-   The terminal renders at the host's exact dimensions (may be wider
-   than the mobile viewport) and the user scrolls to see it. */
-.terminal-area {
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Let the terminal render at its natural (host) size instead of
-   absolute-filling the container. Only one terminal is visible
-   at a time (others are display:none). */
-.terminal-container {
+/* Terminal container in web client: relative positioning, natural size.
+   Allows scrolling to see the full host-sized terminal. */
+.web-terminal-area .absolute {
   position: relative;
-  top: auto; left: auto; right: auto; bottom: auto;
+  inset: auto;
   width: max-content;
   min-width: 100%;
   height: max-content;

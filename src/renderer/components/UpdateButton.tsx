@@ -20,7 +20,7 @@ export default function UpdateButton() {
 
   return (
     <button
-      className="update-btn"
+      className="text-[#569cd6] hover:text-[#79b8f8] p-1 flex items-center animate-pulse"
       onClick={() => window.claudeTerminal.openExternal(update.url)}
       title={`Update available: v${update.version}`}
     >

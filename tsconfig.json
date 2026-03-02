@@ -15,7 +15,8 @@
     "types": ["vitest/globals"],
     "paths": {
       "@shared/*": ["src/shared/*"],
-      "@main/*": ["src/main/*"]
+      "@main/*": ["src/main/*"],
+      "@/*": ["src/renderer/*"]
     }
   },
   "include": ["src/**/*", "tests/**/*"],

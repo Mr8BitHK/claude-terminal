@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { PermissionMode } from '../../shared/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 
 interface StartupDialogProps {
   onStart: (dir: string, mode: PermissionMode) => void;
@@ -18,10 +23,7 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypassPermissions');
 
   useEffect(() => {
-    // Load recent directories
     window.claudeTerminal.getRecentDirs().then(setRecentDirs).catch(() => {});
-
-    // Load saved permission mode
     window.claudeTerminal.getPermissionMode().then(setPermissionMode).catch(() => {});
   }, []);
 
@@ -53,23 +55,28 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
   };
 
   return (
-    <div className="dialog-overlay" onKeyDown={handleKeyDown}>
-      <div className="dialog startup-dialog">
-        <div className="startup-header">
-          <h1>Claude Terminal</h1>
-        </div>
+    <Dialog open>
+      <DialogContent className="max-w-[480px]" onKeyDown={handleKeyDown}>
+        <DialogHeader className="text-center">
+          <DialogTitle className="text-xl">Claude Terminal</DialogTitle>
+        </DialogHeader>
 
-        <div className="dir-section">
-          <label className="section-label">Directory</label>
+        <div className="flex flex-col gap-2">
+          <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Directory
+          </Label>
           {recentDirs.length > 0 && (
-            <ul className="recent-dirs" role="listbox" aria-label="Recent directories">
+            <ul className="flex flex-col gap-0.5 max-h-[200px] overflow-y-auto" role="listbox" aria-label="Recent directories">
               {recentDirs.map((dir) => (
                 <li
                   key={dir}
                   role="option"
                   tabIndex={0}
                   aria-selected={selectedDir === dir}
-                  className={selectedDir === dir ? 'selected' : ''}
+                  className={cn(
+                    'group flex items-center justify-between px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-muted',
+                    selectedDir === dir && 'bg-secondary'
+                  )}
                   onClick={() => setSelectedDir(dir)}
                   onDoubleClick={() => {
                     setSelectedDir(dir);
@@ -82,47 +89,49 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
                     }
                   }}
                 >
-                  <span className="dir-path">{dir}</span>
-                  <button
-                    className="remove-dir-btn"
+                  <span className="truncate text-foreground">{dir}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 h-5 w-5 text-muted-foreground hover:text-foreground shrink-0"
                     onClick={(e) => handleRemoveDir(dir, e)}
                     title="Remove from history"
                   >
                     ×
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
-          <button className="browse-btn" onClick={handleBrowse}>
+          <Button variant="outline" size="sm" onClick={handleBrowse}>
             Browse…
-          </button>
+          </Button>
         </div>
 
-        <div className="permission-section">
-          <label className="section-label">Permissions</label>
-          {PERMISSION_OPTIONS.map((opt) => (
-            <label key={opt.value} className="radio-option">
-              <input
-                type="radio"
-                name="permissionMode"
-                value={opt.value}
-                checked={permissionMode === opt.value}
-                onChange={() => setPermissionMode(opt.value)}
-              />
-              {opt.label}
-            </label>
-          ))}
+        <div className="flex flex-col gap-2">
+          <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Permissions
+          </Label>
+          <RadioGroup
+            value={permissionMode}
+            onValueChange={(value) => setPermissionMode(value as PermissionMode)}
+            className="flex gap-4"
+          >
+            {PERMISSION_OPTIONS.map((opt) => (
+              <div key={opt.value} className="flex items-center gap-1.5">
+                <RadioGroupItem value={opt.value} id={`perm-${opt.value}`} />
+                <Label htmlFor={`perm-${opt.value}`} className="text-sm cursor-pointer">
+                  {opt.label}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
         </div>
 
-        <button
-          className="start-btn-primary"
-          disabled={!selectedDir}
-          onClick={handleStart}
-        >
+        <Button className="w-full" disabled={!selectedDir} onClick={handleStart}>
           Start
-        </button>
-      </div>
-    </div>
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }

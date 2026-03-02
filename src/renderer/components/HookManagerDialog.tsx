@@ -2,6 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, ChevronUp, ChevronDown, Zap } from 'lucide-react';
 import type { RepoHook, RepoHookConfig, HookCommand, HookEvent } from '../../shared/types';
 import { HOOK_EVENTS } from '../../shared/types';
+import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 interface HookManagerDialogProps {
   onClose: () => void;
@@ -26,6 +34,7 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -118,135 +127,155 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
   };
 
   const handleClose = useCallback(() => {
-    if (dirty && !window.confirm('You have unsaved changes. Close anyway?')) return;
+    if (dirty) {
+      setShowConfirmClose(true);
+      return;
+    }
     onClose();
   }, [dirty, onClose]);
 
   if (loading) {
     return (
-      <div className="dialog-overlay" onClick={handleClose}>
-        <div className="dialog hook-dialog" onClick={e => e.stopPropagation()}>
-          <p>Loading...</p>
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => { if (!open) handleClose(); }}>
+        <DialogContent>
+          <p className="text-muted-foreground">Loading...</p>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
-    <div className="dialog-overlay" onClick={handleClose}>
-      <div className="dialog hook-dialog" onClick={e => e.stopPropagation()}>
-        <h2>Manage Hooks</h2>
-        <div className="hook-layout">
+    <>
+    <Dialog open onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <DialogContent className="w-[700px] max-w-[90vw] max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Manage Hooks</DialogTitle>
+        </DialogHeader>
+        <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Left panel: hook list */}
-          <div className="hook-list-panel">
-            <div className="hook-list">
+          <div className="flex flex-col gap-2 w-[200px] shrink-0">
+            <div className="flex flex-col gap-0.5 overflow-y-auto flex-1">
               {config.hooks.map(hook => (
-                <div
+                <button
                   key={hook.id}
-                  className={`hook-list-item ${hook.id === selectedId ? 'hook-list-item-active' : ''}`}
+                  className={cn(
+                    'flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-muted text-left',
+                    hook.id === selectedId && 'bg-secondary'
+                  )}
                   onClick={() => setSelectedId(hook.id)}
                 >
-                  <div className="hook-list-item-info">
-                    <span className="hook-list-item-name">{hook.name}</span>
-                    <span className={`hook-badge hook-badge-${hook.event.split(':')[0]}`}>
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="truncate">{hook.name}</span>
+                    <Badge variant="secondary" className="text-[10px] px-1 w-fit">
                       {hook.event}
-                    </span>
+                    </Badge>
                   </div>
-                  <label className="hook-toggle" onClick={e => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
+                  <div onClick={e => e.stopPropagation()}>
+                    <Switch
                       checked={hook.enabled}
-                      onChange={e => updateHook(hook.id, { enabled: e.target.checked })}
+                      onCheckedChange={(checked) => updateHook(hook.id, { enabled: checked })}
                     />
-                    <span className="hook-toggle-slider" />
-                  </label>
-                </div>
+                  </div>
+                </button>
               ))}
             </div>
-            <button className="hook-add-btn" onClick={addHook}>
+            <Button size="sm" onClick={addHook}>
               <Plus size={14} /> Add Hook
-            </button>
+            </Button>
           </div>
 
           {/* Right panel: hook editor */}
-          <div className="hook-editor-panel">
+          <div className="flex-1 flex flex-col gap-3 overflow-y-auto min-w-0">
             {selected ? (
               <>
-                <div className="hook-field">
-                  <label>Name</label>
-                  <input
+                <div className="flex flex-col gap-1">
+                  <Label>Name</Label>
+                  <Input
                     type="text"
                     value={selected.name}
                     onChange={e => updateHook(selected.id, { name: e.target.value })}
                   />
                 </div>
-                <div className="hook-field">
-                  <label>Event</label>
-                  <select
+                <div className="flex flex-col gap-1">
+                  <Label>Event</Label>
+                  <Select
                     value={selected.event}
-                    onChange={e => updateHook(selected.id, { event: e.target.value as HookEvent })}
+                    onValueChange={(value) => updateHook(selected.id, { event: value as HookEvent })}
                   >
-                    {HOOK_EVENTS.map(ev => (
-                      <option key={ev} value={ev}>{ev}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HOOK_EVENTS.map(ev => (
+                        <SelectItem key={ev} value={ev}>{ev}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="hook-field">
-                  <label>Commands</label>
-                  <div className="hook-commands">
+                <div className="flex flex-col gap-1">
+                  <Label>Commands</Label>
+                  <div className="flex flex-col gap-1.5">
                     {selected.commands.map((cmd, idx) => (
-                      <div key={idx} className="hook-command-row">
-                        <input
-                          type="text"
-                          className="hook-cmd-path"
+                      <div key={idx} className="flex items-center gap-1">
+                        <Input
+                          className="w-[80px] shrink-0"
                           placeholder="path"
                           value={cmd.path}
                           onChange={e => updateCommand(selected.id, idx, { path: e.target.value })}
                         />
-                        <input
-                          type="text"
-                          className="hook-cmd-command"
+                        <Input
+                          className="flex-1"
                           placeholder="command"
                           value={cmd.command}
                           onChange={e => updateCommand(selected.id, idx, { command: e.target.value })}
                         />
-                        <button
-                          className="hook-cmd-btn"
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
                           onClick={() => moveCommand(selected.id, idx, -1)}
                           disabled={idx === 0}
                           title="Move up"
                         >
                           <ChevronUp size={12} />
-                        </button>
-                        <button
-                          className="hook-cmd-btn"
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
                           onClick={() => moveCommand(selected.id, idx, 1)}
                           disabled={idx === selected.commands.length - 1}
                           title="Move down"
                         >
                           <ChevronDown size={12} />
-                        </button>
-                        <button
-                          className="hook-cmd-btn hook-cmd-delete"
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 hover:text-destructive"
                           onClick={() => removeCommand(selected.id, idx)}
                           disabled={selected.commands.length <= 1}
                           title="Remove"
                         >
                           <Trash2 size={12} />
-                        </button>
+                        </Button>
                       </div>
                     ))}
-                    <button className="hook-add-cmd-btn" onClick={() => addCommand(selected.id)}>
+                    <Button variant="outline" size="sm" onClick={() => addCommand(selected.id)} className="w-fit">
                       <Plus size={12} /> Add Command
-                    </button>
+                    </Button>
                   </div>
                 </div>
-                <button className="hook-delete-hook-btn" onClick={() => deleteHook(selected.id)}>
+                <Button
+                  variant="outline"
+                  className="text-destructive border-destructive hover:bg-destructive/10 w-fit mt-2"
+                  onClick={() => deleteHook(selected.id)}
+                >
                   <Trash2 size={14} /> Delete Hook
-                </button>
+                </Button>
               </>
             ) : (
-              <div className="hook-empty">
+              <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-2">
                 <Zap size={32} />
                 <p>No hooks configured.</p>
                 <p>Click &quot;Add Hook&quot; to get started.</p>
@@ -255,13 +284,30 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
           </div>
         </div>
 
-        <div className="dialog-actions">
+        <DialogFooter>
           {dirty && (
-            <button className="hook-save-btn" onClick={handleSave}>Save</button>
+            <Button className="bg-success hover:bg-success/90" onClick={handleSave}>Save</Button>
           )}
-          <button onClick={handleClose}>Close</button>
-        </div>
-      </div>
-    </div>
+          <Button variant="secondary" onClick={handleClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    {showConfirmClose && (
+      <Dialog open onOpenChange={(open) => { if (!open) setShowConfirmClose(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved changes</DialogTitle>
+          </DialogHeader>
+          <DialogDescription>You have unsaved changes. Close anyway?</DialogDescription>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowConfirmClose(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { setShowConfirmClose(false); onClose(); }}>
+              Discard & Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }

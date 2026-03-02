@@ -297,7 +297,7 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
   return (
     <div
       ref={containerRef}
-      className="terminal-container"
+      className="absolute inset-0"
       style={{ display: isVisible ? 'block' : 'none' }}
     />
   );
