@@ -6,6 +6,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { terminalCache, pendingBytes, pausedTabs, pendingWrites } from './terminalCache';
+import { matchKeybinding, isTabJump } from '../keybindings';
 
 interface TerminalProps {
   tabId: string;
@@ -122,18 +123,12 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
         window.claudeTerminal.openExternal(uri);
       }));
 
-      // Let app-level shortcuts pass through to the window handler
+      // Let registered app-level shortcuts pass through xterm
       term.attachCustomKeyEventHandler((e) => {
-        if (e.altKey && e.key === 'F4') return false;
-        if (e.ctrlKey && (e.key === 'F4' || e.key === 't' || e.key === 'w' || e.key === 'p' || e.key === 'l' || e.key === 'Tab'))
-          return false;
-        if (e.ctrlKey && e.key >= '1' && e.key <= '9') return false;
-        if (e.key === 'F2') return false;
-        // Ctrl+Enter: insert newline instead of submitting
-        if (e.ctrlKey && e.key === 'Enter') {
-          if (e.type === 'keydown') {
-            window.claudeTerminal.writeToPty(tabId, '\x1b\r');
-          }
+        if (isTabJump(e)) return false;
+        const kb = matchKeybinding(e);
+        if (kb) {
+          if (kb.onTerminal && e.type === 'keydown') kb.onTerminal(tabId);
           return false;
         }
         return true;

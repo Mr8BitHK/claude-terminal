@@ -6,6 +6,7 @@ import Terminal from './components/Terminal';
 import { destroyTerminal } from './components/terminalCache';
 import StatusBar from './components/StatusBar';
 import { buildWindowTitle } from '../shared/window-title';
+import { matchKeybinding, isTabJump, type KeybindingContext } from './keybindings';
 import WorktreeNameDialog from './components/WorktreeNameDialog';
 import WorktreeManagerDialog from './components/WorktreeManagerDialog';
 import WorktreeCloseDialog from './components/WorktreeCloseDialog';
@@ -264,79 +265,30 @@ export default function App() {
   useEffect(() => {
     if (appState !== 'running') return;
 
+    const ctx: KeybindingContext = {
+      activeTabId: () => activeTabIdRef.current,
+      tabs: () => tabsRef.current,
+      createNewWindow: () => window.claudeTerminal.createNewWindow(),
+      newTab: handleNewTabWithoutWorktree,
+      newWorktreeTab: tryShowWorktreeDialog,
+      newShellTab: handleNewShellTab,
+      closeTab: handleCloseTab,
+      selectTab: handleSelectTab,
+      renameTab: (id) => setRenamingTabId(id),
+    };
+
     const handler = (e: KeyboardEvent) => {
-      const currentTabs = tabsRef.current;
-      const currentActiveId = activeTabIdRef.current;
-
-      // Ctrl+T: new tab (no worktree, no dialog)
-      if (e.ctrlKey && e.key === 't') {
-        e.preventDefault();
-        handleNewTabWithoutWorktree();
-        return;
-      }
-
-      // Ctrl+W: new worktree tab (prompt for name)
-      if (e.ctrlKey && e.key === 'w') {
-        e.preventDefault();
-        tryShowWorktreeDialog();
-        return;
-      }
-
-      // Ctrl+P: new PowerShell tab
-      if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        handleNewShellTab('powershell', currentActiveId ?? undefined);
-        return;
-      }
-
-      // Ctrl+L: new WSL tab
-      if (e.ctrlKey && e.key === 'l') {
-        e.preventDefault();
-        handleNewShellTab('wsl', currentActiveId ?? undefined);
-        return;
-      }
-
-      // Ctrl+F4: close tab
-      if (e.ctrlKey && e.key === 'F4') {
-        e.preventDefault();
-        if (currentActiveId) {
-          handleCloseTab(currentActiveId);
-        }
-        return;
-      }
-
-      // Ctrl+Tab / Ctrl+Shift+Tab: switch tabs
-      if (e.ctrlKey && e.key === 'Tab') {
-        e.preventDefault();
-        if (currentTabs.length <= 1) return;
-        const currentIdx = currentTabs.findIndex((t) => t.id === currentActiveId);
-        let nextIdx: number;
-        if (e.shiftKey) {
-          nextIdx = currentIdx <= 0 ? currentTabs.length - 1 : currentIdx - 1;
-        } else {
-          nextIdx = currentIdx >= currentTabs.length - 1 ? 0 : currentIdx + 1;
-        }
-        handleSelectTab(currentTabs[nextIdx].id);
-        return;
-      }
-
-      // Ctrl+1-9: jump to tab
-      if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
+      if (isTabJump(e)) {
         e.preventDefault();
         const idx = parseInt(e.key) - 1;
-        if (idx < currentTabs.length) {
-          handleSelectTab(currentTabs[idx].id);
-        }
+        if (idx < tabsRef.current.length) handleSelectTab(tabsRef.current[idx].id);
         return;
       }
 
-      // F2: rename active tab
-      if (e.key === 'F2') {
+      const kb = matchKeybinding(e);
+      if (kb?.action) {
         e.preventDefault();
-        if (currentActiveId) {
-          setRenamingTabId(currentActiveId);
-        }
-        return;
+        kb.action(ctx);
       }
     };
 

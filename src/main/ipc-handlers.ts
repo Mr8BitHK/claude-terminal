@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain, shell } from 'electron';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -491,6 +492,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     if (state.mainWindow) {
       state.mainWindow.setTitle(title);
     }
+  });
+
+  // ---- New window ----
+  ipcMain.on('window:createNew', () => {
+    spawn(process.execPath, [], { detached: true, stdio: 'ignore' }).unref();
   });
 
   // ---- Open external URLs ----

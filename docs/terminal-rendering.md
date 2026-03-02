@@ -121,30 +121,34 @@ This stops hidden terminals from triggering idle GPU repaints caused by the blin
 
 `attachCustomKeyEventHandler` intercepts keyboard events before xterm processes them. Returning `false` prevents xterm from consuming the event, letting it bubble up to the window-level handler in `App.tsx`.
 
-### Intercepted Keys
+All app-level keybindings are defined in a central registry (`src/renderer/keybindings.ts`). Each entry declares its modifier, key, and handler in one place. Terminal.tsx calls `matchKeybinding(e)` to decide whether to pass a key through; App.tsx calls the same function to dispatch the matched action.
 
-| Key | Returned to window | App.tsx action |
-|-----|-------------------|----------------|
-| `Ctrl+T` | Yes | New Claude tab (no worktree) |
-| `Ctrl+W` | Yes | New worktree tab (prompts for name) |
-| `Ctrl+P` | Yes | New PowerShell tab |
-| `Ctrl+L` | Yes | New WSL tab |
-| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Yes | Switch to next/previous tab |
-| `Ctrl+F4` | Yes | Close active tab |
-| `Ctrl+1` through `Ctrl+9` | Yes | Jump to tab by index |
-| `F2` | Yes | Rename active tab |
-| `Alt+F4` | Yes | Close window (OS default) |
+### Registered Keybindings
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+N` | New window (spawns independent app instance) |
+| `Ctrl+T` | New Claude tab (no worktree) |
+| `Ctrl+W` | New worktree tab (prompts for name) |
+| `Ctrl+P` | New PowerShell tab |
+| `Ctrl+L` | New WSL tab |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch to next/previous tab |
+| `Ctrl+F4` | Close active tab |
+| `Ctrl+1` through `Ctrl+9` | Jump to tab by index |
+| `F2` | Rename active tab |
+| `Alt+F4` | Pass through to OS (close window) |
+| `Ctrl+Enter` | Insert literal newline in terminal (terminal-only, see below) |
 
 ### Ctrl+Enter Literal Newline
 
-`Ctrl+Enter` is a special case. Instead of bubbling the event, the handler directly writes `\x1b\r` (ESC followed by CR) to the PTY on `keydown`. This inserts a literal newline in Claude Code's prompt without submitting it. The event is still suppressed from xterm (returns `false`).
+`Ctrl+Enter` is a special case handled via the `onTerminal` callback in the registry. Instead of bubbling to an app-level handler, it directly writes `\x1b\r` (ESC followed by CR) to the PTY on `keydown`. This inserts a literal newline in Claude Code's prompt without submitting it. The event is still suppressed from xterm (returns `false`).
 
 ### Two-Layer Key Handling
 
 Key events flow through two layers:
 
-1. **xterm filter** (`Terminal.tsx`): intercepts app-level shortcuts, returns `false` to let them bubble
-2. **Window handler** (`App.tsx`): `window.addEventListener('keydown', handler)` picks up the bubbled events and executes the corresponding action (create tab, switch tab, etc.)
+1. **xterm filter** (`Terminal.tsx`): calls `matchKeybinding(e)` — if a match is found, runs any `onTerminal` callback and returns `false` to let the event bubble. `isTabJump(e)` handles the `Ctrl+1-9` range separately.
+2. **Window handler** (`App.tsx`): `window.addEventListener('keydown', handler)` picks up the bubbled events, calls `matchKeybinding(e)` again, and invokes `kb.action(ctx)` with a `KeybindingContext` that provides access to tab operations.
 
 All other keys (regular typing, arrow keys, etc.) return `true` and are handled normally by xterm, which forwards them to the PTY via `term.onData()`.
 

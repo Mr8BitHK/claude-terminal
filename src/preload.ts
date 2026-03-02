@@ -72,6 +72,10 @@ const api = {
   setWindowTitle: (title: string): void =>
     ipcRenderer.send('window:setTitle', title),
 
+  // New window
+  createNewWindow: (): void =>
+    ipcRenderer.send('window:createNew'),
+
   // Open external URLs in default browser
   openExternal: (url: string): void =>
     ipcRenderer.send('shell:openExternal', url),

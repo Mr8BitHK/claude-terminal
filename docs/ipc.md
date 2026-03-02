@@ -130,6 +130,7 @@ Note: `pty:resized` is sent by the main process to notify remote web clients of 
 | Channel | Direction | Pattern | Renderer Signature | Payload |
 |---|---|---|---|---|
 | `window:setTitle` | renderer -> main | send | `setWindowTitle(title)` | `title: string` |
+| `window:createNew` | renderer -> main | send | `createNewWindow()` | *(none)* — spawns a new detached app instance |
 
 ### Remote Access
 

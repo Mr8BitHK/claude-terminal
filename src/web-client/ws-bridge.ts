@@ -298,10 +298,13 @@ export class WebSocketBridge {
       removeRecentDir: async (): Promise<void> => {},
       getPermissionMode: async () => 'default' as const,
 
-      // Window title (no-op in browser)
+      // Window title (browser uses document.title)
       setWindowTitle: (title: string): void => {
         document.title = title;
       },
+
+      // New window (not available remotely)
+      createNewWindow: (): void => {},
 
       // Startup (stubs)
       selectDirectory: async (): Promise<string | null> => null,

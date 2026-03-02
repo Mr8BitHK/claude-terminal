@@ -141,6 +141,7 @@ describe('registerIpcHandlers', () => {
     expect(listeners.has('pty:pause')).toBe(true);
     expect(listeners.has('pty:resume')).toBe(true);
     expect(listeners.has('window:setTitle')).toBe(true);
+    expect(listeners.has('window:createNew')).toBe(true);
   });
 
   it('session:start sets workspace dir and permission mode', async () => {

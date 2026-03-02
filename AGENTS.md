@@ -71,6 +71,7 @@ pnpm run test:watch     # Watch mode
 ## Rules
 
 - **NEVER merge worktree branches into master (or any other branch) without explicit user permission.** Worktrees are isolated for a reason. Always ask before merging, rebasing, or otherwise integrating worktree branches.
+- **Do NOT commit or push unless the user asks.** Batch your changes and let the user decide when to commit. Never continuously commit after each small fix.
 
 ## Documentation
 
@@ -107,6 +108,49 @@ Documentation must stay in sync with code. When implementing or changing a featu
 3. **New feature = new doc.** If a feature doesn't fit into any existing doc, create `docs/<feature-name>.md` and add a row to the feature docs table above.
 4. **Doc style.** Match the existing docs: technical prose, ASCII flow diagrams for data/control flow, TypeScript code blocks for types/interfaces, tables for structured references, a "Key Files" table at the end. No fluff.
 5. **Update this table.** When adding or removing a doc, update the feature docs table in this section so AGENTS.md stays the single index of all documentation.
+
+## Code Review Standards
+
+### IPC & Preload
+
+- New IPC channels follow `noun:action` naming (`tab:create`, `pty:write`).
+- Use `ipcMain.handle` for request/response, `ipcMain.on` for fire-and-forget.
+- Every new channel needs: main handler (`ipc-handlers.ts`) + preload method (`preload.ts`) + type in `global.d.ts` + assertion in the registration test (`tests/main/ipc-handlers.test.ts`).
+- Explicitly decide whether a new channel is available remotely. If yes, add handling in `WebRemoteServer.handleMessage()` and the web client's `ws-bridge.ts`. If no, add a stub/no-op in `ws-bridge.ts` and document why it's local-only.
+
+### Remote / Local Parity
+
+- New features must consider remote access: will remote clients see this? Can they trigger it? Should they?
+- Channels broadcast to remote are explicitly listed in `sendToRenderer()` (`src/main/index.ts`). New broadcast channels must be added there.
+- Destructive operations (close tab, remove worktree, resize PTY) stay local-only by default.
+- The web client's `WebSocketBridge` must stub any new preload API method, even if it throws or no-ops.
+
+### Type Safety
+
+- Use `import type` for type-only imports.
+- No `as any` without a justifying comment.
+- Shared types go in `src/shared/types.ts`.
+
+### Security
+
+- Validate path parameters before `path.join()` — reject `..` and absolute paths.
+- Process spawn must use array args (no shell interpolation of user input).
+- No credentials or tokens in logs.
+- Remote auth token comparison uses `crypto.timingSafeEqual` — keep it that way.
+
+### React
+
+- `useEffect` listeners must return cleanup functions.
+- Use `useRef` for values accessed inside event handlers (avoid stale closures).
+- `useCallback` for handlers passed as props to children.
+
+### Logging
+
+- Use the `log` module (`src/main/logger.ts`), never `console.log`.
+
+### Documentation
+
+- Feature changes must update the corresponding doc in `docs/` per the documentation table above.
 
 ## Common Patterns
 
