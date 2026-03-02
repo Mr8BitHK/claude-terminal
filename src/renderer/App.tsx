@@ -30,8 +30,8 @@ export default function App() {
   // Multi-project state
   const [projects, setProjects] = useState<ProjectConfig[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
+  const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
 
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
@@ -198,9 +198,12 @@ export default function App() {
     ));
   }, []);
 
-  const handleAddProject = useCallback(async () => {
-    const dir = await window.claudeTerminal.selectDirectory();
-    if (!dir) return;
+  const handleAddProject = useCallback(() => {
+    setShowAddProjectDialog(true);
+  }, []);
+
+  const handleAddProjectConfirm = useCallback(async (dir: string) => {
+    setShowAddProjectDialog(false);
     try {
       const config = await window.claudeTerminal.addProject(dir);
       // Dedup: onProjectAdded listener may have already added it
@@ -209,10 +212,6 @@ export default function App() {
         return [...prev, config];
       });
       setActiveProjectId(config.id);
-      // Auto-expand sidebar when adding a second project
-      if (projects.length >= 1) {
-        setSidebarCollapsed(false);
-      }
       // Auto-create first tab for the new project
       const tab = await window.claudeTerminal.createTab(config.id, null);
       setActiveTabId(tab.id);
@@ -479,12 +478,10 @@ export default function App() {
           projects={projects}
           activeProjectId={activeProjectId ?? ''}
           tabCounts={tabCounts}
-          collapsed={sidebarCollapsed}
           onSelectProject={handleSelectProject}
           onAddProject={handleAddProject}
           onRemoveProject={handleRemoveProject}
           onRenameProject={handleRenameProject}
-          onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
         />
       )}
       <div className="flex flex-col flex-1 min-w-0">
@@ -566,6 +563,14 @@ export default function App() {
             handleAddProject();
           }}
           onCancel={() => setShowProjectSwitcher(false)}
+        />
+      )}
+      {showAddProjectDialog && (
+        <StartupDialog
+          title="Add Project"
+          hidePermissions
+          onStart={(dir) => handleAddProjectConfirm(dir)}
+          onCancel={() => setShowAddProjectDialog(false)}
         />
       )}
       <Dialog open={!!alertMessage} onOpenChange={() => setAlertMessage(null)}>

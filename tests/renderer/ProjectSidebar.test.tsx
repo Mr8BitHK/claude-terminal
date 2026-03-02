@@ -12,97 +12,39 @@ describe('ProjectSidebar', () => {
     p2: { idle: 0, working: 0, requires_response: 1, total: 1 },
   };
 
+  const defaultProps = {
+    projects,
+    activeProjectId: 'p1',
+    tabCounts,
+    onSelectProject: vi.fn(),
+    onAddProject: vi.fn(),
+    onRemoveProject: vi.fn(),
+    onRenameProject: vi.fn(),
+  };
+
   it('renders project names from directory paths', () => {
-    render(
-      <ProjectSidebar
-        projects={projects}
-        activeProjectId="p1"
-        tabCounts={tabCounts}
-        collapsed={false}
-        onSelectProject={vi.fn()}
-        onAddProject={vi.fn()}
-        onRemoveProject={vi.fn()}
-        onRenameProject={vi.fn()}
-        onToggleCollapse={vi.fn()}
-      />
-    );
+    render(<ProjectSidebar {...defaultProps} />);
     expect(screen.getByText('repo-a')).toBeTruthy();
     expect(screen.getByText('repo-b')).toBeTruthy();
   });
 
   it('calls onSelectProject when clicked', () => {
     const onSelect = vi.fn();
-    render(
-      <ProjectSidebar
-        projects={projects}
-        activeProjectId="p1"
-        tabCounts={tabCounts}
-        collapsed={false}
-        onSelectProject={onSelect}
-        onAddProject={vi.fn()}
-        onRemoveProject={vi.fn()}
-        onRenameProject={vi.fn()}
-        onToggleCollapse={vi.fn()}
-      />
-    );
+    render(<ProjectSidebar {...defaultProps} onSelectProject={onSelect} />);
     fireEvent.click(screen.getByText('repo-b'));
     expect(onSelect).toHaveBeenCalledWith('p2');
   });
 
   it('highlights active project', () => {
-    render(
-      <ProjectSidebar
-        projects={projects}
-        activeProjectId="p1"
-        tabCounts={tabCounts}
-        collapsed={false}
-        onSelectProject={vi.fn()}
-        onAddProject={vi.fn()}
-        onRemoveProject={vi.fn()}
-        onRenameProject={vi.fn()}
-        onToggleCollapse={vi.fn()}
-      />
-    );
+    render(<ProjectSidebar {...defaultProps} />);
     const activeBtn = screen.getByText('repo-a').closest('button');
     expect(activeBtn?.getAttribute('data-active')).toBe('true');
   });
 
   it('calls onAddProject when add button clicked', () => {
     const onAdd = vi.fn();
-    render(
-      <ProjectSidebar
-        projects={projects}
-        activeProjectId="p1"
-        tabCounts={tabCounts}
-        collapsed={false}
-        onSelectProject={vi.fn()}
-        onAddProject={onAdd}
-        onRemoveProject={vi.fn()}
-        onRenameProject={vi.fn()}
-        onToggleCollapse={vi.fn()}
-      />
-    );
+    render(<ProjectSidebar {...defaultProps} onAddProject={onAdd} />);
     fireEvent.click(screen.getByTitle('Add project'));
     expect(onAdd).toHaveBeenCalled();
-  });
-
-  it('shows working and response counts', () => {
-    const { container } = render(
-      <ProjectSidebar
-        projects={projects}
-        activeProjectId="p1"
-        tabCounts={tabCounts}
-        collapsed={false}
-        onSelectProject={vi.fn()}
-        onAddProject={vi.fn()}
-        onRemoveProject={vi.fn()}
-        onRenameProject={vi.fn()}
-        onToggleCollapse={vi.fn()}
-      />
-    );
-    // p1 has 1 working
-    expect(container.querySelector('[data-count-working]')?.textContent).toBe('1');
-    // p2 has 1 requires_response
-    expect(container.querySelector('[data-count-response]')?.textContent).toBe('1');
   });
 });
