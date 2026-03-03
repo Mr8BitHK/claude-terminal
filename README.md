@@ -6,7 +6,7 @@
 
 ![ClaudeTerminal demo](docs/quickdemo.gif)
 
-A tabbed terminal manager for running multiple **Claude Code** sessions side by side — with session persistence, git worktree integration, and auto-naming.
+A tabbed terminal manager for running multiple **Claude Code** sessions side by side — with multi-project workspaces, session persistence, git worktree integration, and auto-naming.
 
 Think Windows Terminal, but purpose-built for Claude Code.
 
@@ -15,6 +15,7 @@ Think Windows Terminal, but purpose-built for Claude Code.
 If you use Claude Code, you've probably found yourself juggling multiple terminal windows — one for your main task, one for a bug fix on a worktree, a shell tab for git operations. ClaudeTerminal puts all of that in one window with:
 
 - **Visual status at a glance** — see which sessions are working, idle, or need input without switching tabs
+- **Multi-project workspaces** — run sessions across multiple repositories in one window, each with its own color tint
 - **Session persistence** — close the app, reopen it, pick up where you left off
 - **One-click worktrees** — `Ctrl+W` creates a git worktree and scopes a new Claude session to it
 - **No context pollution** — each tab is isolated, with auto-generated descriptive names
@@ -51,6 +52,14 @@ Grab the latest release for your platform:
 - Built-in worktree manager
 - Open new Claude sessions scoped to a specific worktree with `Ctrl+W`
 - Branches from the current directory's git branch, not just main
+
+### Multi-Project Workspaces
+- Open sessions across multiple repositories in a single window with `Ctrl+N`
+- Each project gets a distinct **color tint** on the window border so you always know which project is active
+- **Project sidebar** — shows all open projects with tab status counts; appears automatically when you have more than one project
+- **Project switcher** — `Ctrl+P` opens a quick-switch overlay with keyboard navigation
+- **Arrow key navigation** — `Ctrl+↑/↓` cycles between projects; `Ctrl+←/→` cycles tabs within the active project
+- Each project's tabs, worktrees, hooks, and git state are fully isolated from each other
 
 ### Repository Hooks
 - Configure shell commands that run automatically on lifecycle events like `worktree:created`, `tab:created`, `session:started`, and more
@@ -90,16 +99,28 @@ Grab the latest release for your platform:
 
 ## Keyboard Shortcuts
 
+**Tabs**
+
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+T` | New Claude tab |
 | `Ctrl+W` | New worktree tab |
 | `Ctrl+Shift+P` | New PowerShell tab |
 | `Ctrl+Shift+L` | New WSL tab |
-| `Ctrl+Tab` | Next tab |
-| `Ctrl+Shift+Tab` | Previous tab |
+| `Ctrl+Tab` / `Ctrl+→` | Next tab |
+| `Ctrl+Shift+Tab` / `Ctrl+←` | Previous tab |
 | `Ctrl+1`–`Ctrl+9` | Jump to tab by number |
 | `Ctrl+F4` | Close tab |
+| `F2` | Rename tab |
+
+**Projects**
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+N` | Add project to workspace |
+| `Ctrl+P` | Open project switcher |
+| `Ctrl+↑` | Previous project |
+| `Ctrl+↓` | Next project |
 
 ## Build from Source
 
