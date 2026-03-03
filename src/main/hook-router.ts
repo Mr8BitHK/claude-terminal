@@ -16,11 +16,18 @@ export interface HookRouterDeps {
 }
 
 export function createHookRouter(deps: HookRouterDeps) {
+  // Track tabs that already have a pending notification so we don't show
+  // duplicates (e.g. tab:status:idle followed immediately by tab:status:input).
+  const pendingNotifications = new Set<string>();
+
   function notifyTabActivity(tabId: string, title: string, body: string) {
     if (!Notification.isSupported()) return;
+    if (pendingNotifications.has(tabId)) return;
+    pendingNotifications.add(tabId);
 
     const notification = new Notification({ title, body });
     notification.on('click', () => {
+      pendingNotifications.delete(tabId);
       const win = deps.getMainWindow();
       if (win) {
         win.show();
@@ -38,6 +45,10 @@ export function createHookRouter(deps: HookRouterDeps) {
       }
     });
     notification.show();
+  }
+
+  function clearPendingNotification(tabId: string) {
+    pendingNotifications.delete(tabId);
   }
 
   function handleHookMessage(msg: IpcMessage) {
@@ -159,5 +170,5 @@ export function createHookRouter(deps: HookRouterDeps) {
     }
   }
 
-  return { handleHookMessage };
+  return { handleHookMessage, clearPendingNotification };
 }

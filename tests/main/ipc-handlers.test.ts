@@ -156,6 +156,7 @@ function makeMockDeps(): IpcHandlerDeps {
     sendToRenderer: vi.fn(),
     persistSessions: vi.fn(),
     cleanupNamingFlag: vi.fn(),
+    clearPendingNotification: vi.fn(),
     activateRemoteAccess: vi.fn(async () => ({ status: 'connecting' as const, tunnelUrl: null, token: 'test-token', error: null })),
     deactivateRemoteAccess: vi.fn(async () => {}),
     getRemoteAccessInfo: vi.fn(() => ({ status: 'inactive' as const, tunnelUrl: null, token: null, error: null })),

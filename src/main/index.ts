@@ -220,7 +220,7 @@ const { generateTabName, generateResumeTabName, cleanupNamingFlag } = createTabN
   tabManager, sendToRenderer, persistSessions,
 });
 
-const { handleHookMessage } = createHookRouter({
+const { handleHookMessage, clearPendingNotification } = createHookRouter({
   tabManager, sendToRenderer, persistSessions,
   generateTabName, generateResumeTabName, cleanupNamingFlag,
   getMainWindow: () => state.mainWindow as BrowserWindow | null,
@@ -362,7 +362,7 @@ app.on('ready', async () => {
 
   const ipcResult = registerIpcHandlers({
     tabManager, ptyManager, settings, workspaceStore, state,
-    sendToRenderer, persistSessions, cleanupNamingFlag,
+    sendToRenderer, persistSessions, cleanupNamingFlag, clearPendingNotification,
     activateRemoteAccess, deactivateRemoteAccess, getRemoteAccessInfo,
   });
   cleanupIpcHandlers = ipcResult.cleanup;

@@ -48,6 +48,7 @@ export interface IpcHandlerDeps {
   sendToRenderer: (channel: string, ...args: unknown[]) => void;
   persistSessions: () => void;
   cleanupNamingFlag: (tabId: string) => void;
+  clearPendingNotification: (tabId: string) => void;
   activateRemoteAccess: () => Promise<RemoteAccessInfo>;
   deactivateRemoteAccess: () => Promise<void>;
   getRemoteAccessInfo: () => RemoteAccessInfo;
@@ -550,6 +551,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
 
   ipcMain.handle('tab:switch', async (_event, tabId: string) => {
     tabManager.setActiveTab(tabId);
+    deps.clearPendingNotification(tabId);
     deps.sendToRenderer('tab:switched', tabId);
   });
 
