@@ -81,8 +81,8 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
       ref={tabRef}
       className={cn(
         'flex items-center gap-1.5 px-3 py-1.5 cursor-pointer border-r border-border text-[13px] select-none [-webkit-app-region:no-drag]',
-        isActive && 'bg-[hsl(var(--instance-hue)_45%_30%)] outline outline-1 outline-[#c9d1d9] font-semibold',
-        !isActive && 'hover:bg-[hsl(var(--instance-hue)_20%_24%)]',
+        isActive && 'bg-[hsl(var(--project-hue)_45%_30%)] outline outline-1 outline-[#c9d1d9] font-semibold',
+        !isActive && 'hover:bg-[hsl(var(--project-hue)_20%_24%)]',
         isDragOver && 'border-l-2 border-l-primary'
       )}
       onClick={() => onSelect(tab.id)}

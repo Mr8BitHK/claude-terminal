@@ -11,6 +11,7 @@ const makeTab = (status: Tab['status']): Tab => ({
   cwd: '/test',
   pid: null,
   sessionId: null,
+  projectId: '',
 });
 
 describe('buildWindowTitle', () => {

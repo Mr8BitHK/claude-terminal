@@ -7,6 +7,7 @@ import { TabManager } from './tab-manager';
 import { PtyManager } from './pty-manager';
 import { HookIpcServer } from './ipc-server';
 import { SettingsStore } from './settings-store';
+import { WorkspaceStore } from './workspace-store';
 import { createTabNamer } from './tab-namer';
 import { createHookRouter } from './hook-router';
 import { registerIpcHandlers, type AppState, type WirePtyToTabFn } from './ipc-handlers';
@@ -27,6 +28,7 @@ if (handleSquirrelEvent(app)) {
 const tabManager = new TabManager();
 const ptyManager = new PtyManager();
 const settings = new SettingsStore();
+const workspaceStore = new WorkspaceStore();
 const PIPE_NAME = `\\\\.\\pipe\\claude-terminal-${process.pid}`;
 let ipcServer: HookIpcServer | null = null;
 const tunnelManager = new TunnelManager();
@@ -54,6 +56,8 @@ function parseCliStartDir(): string | null {
 // Shared mutable state
 // ---------------------------------------------------------------------------
 const state: AppState = {
+  workspaceId: null,
+  projectManager: null,
   workspaceDir: null,
   permissionMode: 'bypassPermissions',
   worktreeManager: null,
@@ -88,6 +92,9 @@ function sendToRenderer(channel: string, ...args: unknown[]) {
     } else if (channel === 'tab:worktreeProgress') {
       webRemoteServer.broadcast({ type: 'tab:worktreeProgress', tabId: args[0], text: args[1] });
     }
+    // Note: project:added, project:removed, tab:projectSwitch, hook:status, and
+    // git:branchChanged are intentionally NOT forwarded to remote clients.
+    // Project management is a local-only operation.
   }
 }
 
@@ -96,6 +103,30 @@ let shuttingDown = false;
 
 async function doPersistSessions() {
   if (shuttingDown) return;
+
+  // Multi-project: persist sessions per project
+  if (state.projectManager) {
+    for (const project of state.projectManager.getAllProjects()) {
+      const projectTabs = tabManager.getTabsByProject(project.id);
+      const claudeTabs = projectTabs.filter(t => t.type === 'claude');
+      const savedTabs = claudeTabs
+        .filter(t => t.sessionId && t.status !== 'new')
+        .map(t => ({
+          name: t.name,
+          cwd: t.cwd,
+          worktree: t.worktree,
+          sessionId: t.sessionId!,
+        }));
+      if (savedTabs.length === 0 && claudeTabs.length > 0) {
+        log.debug('[sessions] skip persist for %s: %d claude tab(s) still initializing', project.dir, claudeTabs.length);
+        continue;
+      }
+      await settings.saveSessions(project.dir, savedTabs);
+    }
+    return;
+  }
+
+  // Legacy single-project fallback
   if (!state.workspaceDir) return;
   const allTabs = tabManager.getAllTabs();
   const claudeTabs = allTabs.filter(t => t.type === 'claude');
@@ -107,8 +138,6 @@ async function doPersistSessions() {
       worktree: t.worktree,
       sessionId: t.sessionId!,
     }));
-  // Don't wipe sessions.json while tabs are still initializing (no sessionId yet).
-  // This prevents reload transitions from clearing saved sessions.
   if (savedTabs.length === 0 && claudeTabs.length > 0) {
     log.debug('[sessions] skip persist: %d claude tab(s) still initializing', claudeTabs.length);
     return;
@@ -328,7 +357,7 @@ app.on('ready', async () => {
   registerUpdateHandlers();
 
   const ipcResult = registerIpcHandlers({
-    tabManager, ptyManager, settings, state,
+    tabManager, ptyManager, settings, workspaceStore, state,
     sendToRenderer, persistSessions, cleanupNamingFlag,
     activateRemoteAccess, deactivateRemoteAccess, getRemoteAccessInfo,
   });

@@ -64,11 +64,28 @@ The renderer accesses the API as `window.claudeTerminal.<method>(...)`.
 
 ## Channel Reference
 
-### Session & Startup
+### Workspace & Project
 
 | Channel | Direction | Pattern | Renderer Signature | Payload |
 |---|---|---|---|---|
-| `session:start` | renderer -> main | invoke | `startSession(dir, mode)` | `dir: string`, `mode: PermissionMode` |
+| `workspace:init` | renderer -> main | invoke | `initWorkspace(mode)` | `mode: PermissionMode` -> `string` (workspace ID) |
+| `workspace:list` | renderer -> main | invoke | `listWorkspaces()` | -> `WorkspaceConfig[]` |
+| `workspace:save` | renderer -> main | invoke | `saveWorkspace(ws)` | `ws: WorkspaceConfig` |
+| `workspace:delete` | renderer -> main | invoke | `deleteWorkspace(wsId)` | `wsId: string` |
+| `project:add` | renderer -> main | invoke | `addProject(dir, id?, colorIndex?)` | `dir: string`, `id?: string`, `colorIndex?: number` -> `ProjectConfig` |
+| `project:remove` | renderer -> main | invoke | `removeProject(projectId)` | `projectId: string` |
+| `project:list` | renderer -> main | invoke | `listProjects()` | -> `ProjectConfig[]` |
+| `project:added` | main -> renderer | webContents.send | `onProjectAdded(cb)` | `project: ProjectConfig` |
+| `project:removed` | main -> renderer | webContents.send | `onProjectRemoved(cb)` | `projectId: string` |
+| `tab:projectSwitch` | main -> renderer | webContents.send | `onProjectSwitch(cb)` | `projectId: string` |
+
+### Session & Startup (Legacy)
+
+The `session:start` channel is retained for backward compatibility. It wraps `workspace:init` + `project:add` into a single call and now returns `{ projectId: string }` instead of `void`.
+
+| Channel | Direction | Pattern | Renderer Signature | Payload |
+|---|---|---|---|---|
+| `session:start` | renderer -> main | invoke | `startSession(dir, mode)` | `dir: string`, `mode: PermissionMode` -> `{ projectId: string }` |
 | `session:getSavedTabs` | renderer -> main | invoke | `getSavedTabs(dir)` | `dir: string` -> `SavedTab[]` |
 | `cli:getStartDir` | renderer -> main | invoke | `getCliStartDir()` | -> `string \| null` |
 
@@ -76,7 +93,7 @@ The renderer accesses the API as `window.claudeTerminal.<method>(...)`.
 
 | Channel | Direction | Pattern | Renderer Signature | Payload |
 |---|---|---|---|---|
-| `tab:create` | renderer -> main | invoke | `createTab(worktree, resumeSessionId?, savedName?)` | -> `Tab` |
+| `tab:create` | renderer -> main | invoke | `createTab(projectId, worktree?, resumeSessionId?, savedName?)` | `projectId: string` -> `Tab` |
 | `tab:createShell` | renderer -> main | invoke | `createShellTab(shellType, afterTabId?, cwd?)` | -> `Tab` |
 | `tab:close` | renderer -> main | invoke | `closeTab(tabId, removeWorktree?)` | `tabId: string`, `removeWorktree?: boolean` |
 | `tab:switch` | renderer -> main | invoke | `switchTab(tabId)` | `tabId: string` |
@@ -103,13 +120,15 @@ Note: `pty:resized` is sent by the main process to notify remote web clients of 
 
 ### Worktree
 
+Worktree channels accept an optional `projectId` parameter to scope the operation to a specific project. If omitted, the first project is used.
+
 | Channel | Direction | Pattern | Renderer Signature | Payload |
 |---|---|---|---|---|
-| `worktree:create` | renderer -> main | invoke | `createWorktree(name)` | `name: string` -> `string` (path) |
-| `worktree:currentBranch` | renderer -> main | invoke | `getCurrentBranch()` | -> `string` |
-| `worktree:listDetails` | renderer -> main | invoke | `listWorktreeDetails()` | -> `{ name, path, clean, changesCount }[]` |
-| `worktree:remove` | renderer -> main | invoke | `removeWorktree(worktreePath)` | `worktreePath: string` |
-| `worktree:checkStatus` | renderer -> main | invoke | `checkWorktreeStatus(worktreePath)` | -> `{ clean: boolean, changesCount: number }` |
+| `worktree:create` | renderer -> main | invoke | `createWorktree(projectId, name)` | `projectId: string`, `name: string` -> `string` (path) |
+| `worktree:currentBranch` | renderer -> main | invoke | `getCurrentBranch(projectId?)` | `projectId?: string` -> `string` |
+| `worktree:listDetails` | renderer -> main | invoke | `listWorktreeDetails(projectId?)` | `projectId?: string` -> `{ name, path, clean, changesCount }[]` |
+| `worktree:remove` | renderer -> main | invoke | `removeWorktree(worktreePath, projectId?)` | `worktreePath: string`, `projectId?: string` |
+| `worktree:checkStatus` | renderer -> main | invoke | `checkWorktreeStatus(worktreePath, projectId?)` | `worktreePath: string`, `projectId?: string` -> `{ clean: boolean, changesCount: number }` |
 
 ### Settings
 
@@ -145,7 +164,7 @@ Note: `pty:resized` is sent by the main process to notify remote web clients of 
 
 | Channel | Direction | Pattern | Renderer Signature | Payload |
 |---|---|---|---|---|
-| `git:branchChanged` | main -> renderer | webContents.send | `onBranchChanged(cb)` | `branch: string` |
+| `git:branchChanged` | main -> renderer | webContents.send | `onBranchChanged(cb)` | `branch: string, projectId?: string` |
 
 ## Event Listeners
 
@@ -164,7 +183,12 @@ Main-to-renderer events are subscribed in the preload via wrapper methods that r
 | `onTabRemoved` | `tab:removed` | `(tabId: string) => void` |
 | `onTabSwitched` | `tab:switched` | `(tabId: string) => void` |
 | `onRemoteAccessUpdate` | `remote:updated` | `(info: RemoteAccessInfo) => void` |
-| `onBranchChanged` | `git:branchChanged` | `(branch: string) => void` |
+| `onBranchChanged` | `git:branchChanged` | `(branch: string, projectId?: string) => void` |
+| `onHookStatus` | `hook:status` | `(status: HookExecutionStatus) => void` |
+| `onWorktreeProgress` | `tab:worktreeProgress` | `(tabId: string, text: string) => void` |
+| `onProjectAdded` | `project:added` | `(project: ProjectConfig) => void` |
+| `onProjectRemoved` | `project:removed` | `(projectId: string) => void` |
+| `onProjectSwitch` | `tab:projectSwitch` | `(projectId: string) => void` |
 
 ### Cleanup Pattern in App.tsx
 
@@ -176,7 +200,11 @@ useEffect(() => {
   const cleanupRemoved = window.claudeTerminal.onTabRemoved((tabId) => { ... });
   const cleanupRemote = window.claudeTerminal.onRemoteAccessUpdate((info) => { ... });
   const cleanupSwitched = window.claudeTerminal.onTabSwitched((tabId) => { ... });
-  const cleanupBranch = window.claudeTerminal.onBranchChanged((b) => { ... });
+  const cleanupBranch = window.claudeTerminal.onBranchChanged((b, projectId) => { ... });
+  const cleanupHookStatus = window.claudeTerminal.onHookStatus((status) => { ... });
+  const cleanupProjectAdded = window.claudeTerminal.onProjectAdded((project) => { ... });
+  const cleanupProjectRemoved = window.claudeTerminal.onProjectRemoved((projectId) => { ... });
+  const cleanupProjectSwitch = window.claudeTerminal.onProjectSwitch((projectId) => { ... });
 
   return () => {
     cleanupUpdate();
@@ -184,6 +212,10 @@ useEffect(() => {
     cleanupRemote();
     cleanupSwitched();
     cleanupBranch();
+    cleanupHookStatus();
+    cleanupProjectAdded();
+    cleanupProjectRemoved();
+    cleanupProjectSwitch();
   };
 }, []);
 ```
@@ -213,14 +245,18 @@ declare global {
 
 Types used across both processes live in `src/shared/types.ts`:
 
-- `Tab` -- Tab state object (id, type, name, status, worktree, cwd, pid, sessionId)
+- `Tab` -- Tab state object (id, type, name, status, worktree, cwd, pid, sessionId, projectId)
 - `SavedTab` -- Persisted tab info for session restore (name, cwd, worktree, sessionId)
 - `TabStatus` -- `'new' | 'working' | 'idle' | 'requires_response' | 'shell'`
 - `TabType` -- `'claude' | 'powershell' | 'wsl'`
 - `PermissionMode` -- `'default' | 'plan' | 'acceptEdits' | 'bypassPermissions'`
+- `ProjectConfig` -- Project identity (id, dir, colorIndex)
+- `WorkspaceConfig` -- Workspace layout (id, name, projects, activeProjectId, geometry)
+- `PROJECT_COLORS` -- 8-entry color palette for per-project tinting (name, hue)
 - `RemoteAccessInfo` -- Remote tunnel state (status, tunnelUrl, token, error)
-- `RemoteAccessStatus` -- `'inactive' | 'connecting' | 'active' | 'error'`
+- `RemoteAccessStatus` -- `'inactive' | 'installing' | 'connecting' | 'active' | 'error'`
 - `IpcMessage` -- Named pipe message format (tabId, event, data)
+- `HookExecutionStatus` -- Hook execution progress (hookId, hookName, event, status, etc.)
 
 ## Flow Control
 
@@ -237,6 +273,8 @@ This is driven by the renderer (via `pausePty`/`resumePty`) when xterm.js signal
 |---|---|
 | `src/preload.ts` | Defines the `contextBridge` API; single source of truth for available IPC methods |
 | `src/main/ipc-handlers.ts` | Registers all `ipcMain.handle` and `ipcMain.on` handlers |
+| `src/main/project-manager.ts` | `ProjectManager` — per-project manager instances, used by IPC handlers |
+| `src/main/workspace-store.ts` | `WorkspaceStore` — persists workspace configs as JSON files |
 | `src/renderer/global.d.ts` | Augments `Window` with the `ClaudeTerminalApi` type |
 | `src/shared/types.ts` | Shared type definitions used in IPC payloads |
 | `src/renderer/App.tsx` | Sets up main-to-renderer event listeners and drives the UI |

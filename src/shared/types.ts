@@ -14,6 +14,7 @@ export interface Tab {
   cwd: string;
   pid: number | null;
   sessionId: string | null;
+  projectId: string;
 }
 
 export interface SavedTab {
@@ -32,6 +33,34 @@ export interface IpcMessage {
 export interface AppSettings {
   recentDirs: string[];
   lastPermissionMode: PermissionMode;
+}
+
+// --- Multi-project workspaces ---
+
+export const PROJECT_COLORS = [
+  { name: 'blue',   hue: 210 },
+  { name: 'green',  hue: 140 },
+  { name: 'orange', hue: 30  },
+  { name: 'purple', hue: 270 },
+  { name: 'teal',   hue: 180 },
+  { name: 'red',    hue: 0   },
+  { name: 'pink',   hue: 330 },
+  { name: 'yellow', hue: 55  },
+] as const;
+
+export interface ProjectConfig {
+  id: string;
+  dir: string;
+  colorIndex: number;
+  displayName?: string;
+}
+
+export interface WorkspaceConfig {
+  id: string;
+  name: string;
+  projects: ProjectConfig[];
+  activeProjectId: string;
+  geometry: { x: number; y: number; width: number; height: number };
 }
 
 export const PERMISSION_FLAGS: Record<PermissionMode, string[]> = {

@@ -2,7 +2,7 @@
  * WebSocket bridge that implements the same API shape as window.claudeTerminal
  * (from src/preload.ts) but communicates over WebSocket instead of Electron IPC.
  */
-import type { Tab, RemoteAccessInfo } from '../shared/types';
+import type { Tab, RemoteAccessInfo, ProjectConfig, WorkspaceConfig } from '../shared/types';
 
 type PtyDataCallback = (tabId: string, data: string) => void;
 type PtyResizedCallback = (tabId: string, cols: number, rows: number) => void;
@@ -232,8 +232,17 @@ export class WebSocketBridge {
    */
   get api() {
     return {
+      // Workspace / Project management (stubs — not available remotely)
+      initWorkspace: async (): Promise<string> => '',
+      addProject: async (): Promise<ProjectConfig> => ({ id: '', dir: '', colorIndex: 0 }),
+      removeProject: async (): Promise<void> => {},
+      listProjects: async (): Promise<ProjectConfig[]> => [],
+      listWorkspaces: async (): Promise<WorkspaceConfig[]> => [],
+      saveWorkspace: async (): Promise<void> => {},
+      deleteWorkspace: async (): Promise<void> => {},
+
       // Tab operations (most are stubs — the server controls tab lifecycle)
-      createTab: async (_worktree?: string | null): Promise<Tab> => {
+      createTab: async (_projectId?: string, _worktree?: string | null): Promise<Tab> => {
         return new Promise((resolve, reject) => {
           this.pendingTabCreate = { resolve, reject };
           this.send({ type: 'tab:create' });
@@ -280,23 +289,31 @@ export class WebSocketBridge {
         // No-op: backpressure not applicable over WebSocket bridge
       },
 
+      reorderTabs: (_tabIds: string[]): void => {},
+
       // Worktree (stubs)
       createWorktree: async (): Promise<string> => {
         throw new Error('Worktree operations are not available in remote mode');
       },
-      getCurrentBranch: async (): Promise<string> => {
+      getCurrentBranch: async (_projectId?: string): Promise<string> => {
         return new Promise((resolve) => {
           this.pendingBranchRequest = { resolve };
           this.send({ type: 'worktree:currentBranch' });
         });
       },
-      listWorktreeDetails: async (): Promise<{ name: string; path: string; clean: boolean; changesCount: number }[]> => [],
-      removeWorktree: async (): Promise<void> => {},
+      listWorktreeDetails: async (_projectId?: string): Promise<{ name: string; path: string; clean: boolean; changesCount: number }[]> => [],
+      removeWorktree: async (_worktreePath: string, _projectId?: string): Promise<void> => {},
+      checkWorktreeStatus: async (_worktreePath: string, _projectId?: string): Promise<{ clean: boolean; changesCount: number }> => ({ clean: true, changesCount: 0 }),
 
       // Settings (stubs)
       getRecentDirs: async (): Promise<string[]> => [],
       removeRecentDir: async (): Promise<void> => {},
       getPermissionMode: async () => 'default' as const,
+
+      // Hook config (stubs — not available remotely)
+      getHookConfig: async () => ({ hooks: {} }),
+      saveHookConfig: async () => {},
+      onHookStatus: (_callback: any) => () => {},
 
       // Window title (browser uses document.title)
       setWindowTitle: (title: string): void => {
@@ -364,6 +381,17 @@ export class WebSocketBridge {
         this.remoteAccessUpdateListeners.add(callback);
         return () => { this.remoteAccessUpdateListeners.delete(callback); };
       },
+
+      onBranchChanged: (_callback: (branch: string, projectId?: string) => void): (() => void) => () => {},
+
+      // Project events (stubs — not available remotely)
+      onProjectAdded: (_callback: (project: ProjectConfig) => void): (() => void) => () => {},
+      onProjectRemoved: (_callback: (projectId: string) => void): (() => void) => () => {},
+      onProjectSwitch: (_callback: (projectId: string) => void): (() => void) => () => {},
+
+      // Update notification (stubs)
+      getUpdateInfo: async (): Promise<null> => null,
+      onUpdateAvailable: (_callback: any): (() => void) => () => {},
 
       onDisconnect: (callback: () => void): (() => void) => {
         this.disconnectListeners.add(callback);

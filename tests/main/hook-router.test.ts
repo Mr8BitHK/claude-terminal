@@ -36,6 +36,7 @@ function makeMockDeps() {
     sendToRenderer: vi.fn(),
     persistSessions: vi.fn(),
     generateTabName: vi.fn(),
+    generateResumeTabName: vi.fn(async () => {}),
     cleanupNamingFlag: vi.fn(),
     getMainWindow: vi.fn(() => ({ show: vi.fn(), focus: vi.fn() })),
     hookEngine: null,

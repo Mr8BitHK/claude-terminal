@@ -18,6 +18,7 @@ export interface KeybindingContext {
   closeTab: (tabId: string) => void;
   selectTab: (tabId: string) => void;
   renameTab: (tabId: string) => void;
+  openProjectSwitcher: () => void;
 }
 
 export interface Keybinding {
@@ -42,7 +43,8 @@ export const keybindings: Keybinding[] = [
   { mod: 'ctrl',       key: 'n',     action: (ctx) => ctx.createNewWindow() },
   { mod: 'ctrl',       key: 't',     action: (ctx) => ctx.newTab() },
   { mod: 'ctrl',       key: 'w',     action: (ctx) => ctx.newWorktreeTab() },
-  { mod: 'ctrl',       key: 'p',     action: (ctx) => ctx.newShellTab('powershell', ctx.activeTabId() ?? undefined) },
+  { mod: 'ctrl',       key: 'p',     action: (ctx) => ctx.openProjectSwitcher() },
+  { mod: 'ctrl+shift', key: 'P',     action: (ctx) => ctx.newShellTab('powershell', ctx.activeTabId() ?? undefined) },
   { mod: 'ctrl',       key: 'l',     action: (ctx) => ctx.newShellTab('wsl', ctx.activeTabId() ?? undefined) },
   { mod: 'ctrl',       key: 'F4',    action: (ctx) => { const id = ctx.activeTabId(); if (id) ctx.closeTab(id); } },
   { mod: 'ctrl',       key: 'Tab',   action: (ctx) => cycleTab(ctx, 1) },

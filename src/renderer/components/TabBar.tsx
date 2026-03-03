@@ -89,7 +89,7 @@ export default function TabBar({
 
   return (
     <div className={cn(
-      'flex bg-[hsl(var(--instance-hue)_30%_18%)] border-b border-border min-h-[36px] items-center px-1 [-webkit-app-region:drag]',
+      'flex bg-[hsl(var(--project-hue)_30%_18%)] border-b border-border min-h-[36px] items-center px-1 [-webkit-app-region:drag]',
       isDragging && '[-webkit-app-region:no-drag]'
     )}>
       {tabs.map((tab, index) => (

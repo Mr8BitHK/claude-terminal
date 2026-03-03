@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PermissionMode, Tab, RemoteAccessInfo, HookExecutionStatus } from '../shared/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PermissionMode, Tab, RemoteAccessInfo, HookExecutionStatus, ProjectConfig } from '../shared/types';
+import { PROJECT_COLORS } from '../shared/types';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
 import { destroyTerminal } from './components/terminalCache';
 import StatusBar from './components/StatusBar';
+import ProjectSidebar from './components/ProjectSidebar';
+import ProjectSwitcherDialog from './components/ProjectSwitcherDialog';
 import { buildWindowTitle } from '../shared/window-title';
 import { matchKeybinding, isTabJump, type KeybindingContext } from './keybindings';
 import WorktreeNameDialog from './components/WorktreeNameDialog';
@@ -24,10 +27,18 @@ export default function App() {
   const [showWorktreeManager, setShowWorktreeManager] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
+  // Multi-project state
+  const [projects, setProjects] = useState<ProjectConfig[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
+  const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
+
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const activeTabIdRef = useRef(activeTabId);
   activeTabIdRef.current = activeTabId;
+  const activeProjectIdRef = useRef(activeProjectId);
+  activeProjectIdRef.current = activeProjectId;
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [remoteInfo, setRemoteInfo] = useState<RemoteAccessInfo>({
@@ -42,16 +53,62 @@ export default function App() {
     tabId: string; worktreeName: string; clean: boolean; changesCount: number;
   } | null>(null);
 
+  // Filter tabs by active project
+  const activeProjectTabs = useMemo(
+    () => activeProjectId ? tabs.filter(t => t.projectId === activeProjectId) : tabs,
+    [tabs, activeProjectId]
+  );
+
+  // Compute tab counts per project for sidebar
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, { idle: number; working: number; requires_response: number; total: number }> = {};
+    for (const project of projects) {
+      counts[project.id] = { idle: 0, working: 0, requires_response: 0, total: 0 };
+    }
+    for (const tab of tabs) {
+      const c = counts[tab.projectId];
+      if (c) {
+        c.total++;
+        if (tab.status === 'idle') c.idle++;
+        else if (tab.status === 'working') c.working++;
+        else if (tab.status === 'requires_response') c.requires_response++;
+      }
+    }
+    return counts;
+  }, [tabs, projects]);
+
+  // Set per-project color tint
+  useEffect(() => {
+    const project = projects.find(p => p.id === activeProjectId);
+    if (project) {
+      const hue = PROJECT_COLORS[project.colorIndex % PROJECT_COLORS.length].hue;
+      document.documentElement.style.setProperty('--project-hue', String(hue));
+    }
+  }, [activeProjectId, projects]);
+
   const handleSelectTab = useCallback(async (tabId: string) => {
     setActiveTabId(tabId);
     await window.claudeTerminal.switchTab(tabId);
   }, []);
 
+  const handleSelectProject = useCallback(async (projectId: string) => {
+    setActiveProjectId(projectId);
+    setShowProjectSwitcher(false);
+    // Auto-select first tab of the new project, or create one if none exist
+    const projectTabs = tabsRef.current.filter(t => t.projectId === projectId);
+    if (projectTabs.length > 0) {
+      handleSelectTab(projectTabs[0].id);
+    } else {
+      const tab = await window.claudeTerminal.createTab(projectId, null);
+      setActiveTabId(tab.id);
+    }
+  }, [handleSelectTab]);
+
   const handleCloseTab = useCallback(async (tabId: string) => {
     const tab = tabsRef.current.find((t) => t.id === tabId);
     if (tab?.worktree) {
       try {
-        const status = await window.claudeTerminal.checkWorktreeStatus(tab.cwd);
+        const status = await window.claudeTerminal.checkWorktreeStatus(tab.cwd, tab.projectId);
         setWorktreeCloseConfirm({
           tabId, worktreeName: tab.worktree, clean: status.clean, changesCount: status.changesCount,
         });
@@ -68,14 +125,14 @@ export default function App() {
   }, []);
 
   const handleNewTabWithoutWorktree = useCallback(async () => {
-    const tab = await window.claudeTerminal.createTab(null);
+    const projectId = activeProjectIdRef.current ?? '';
+    const tab = await window.claudeTerminal.createTab(projectId, null);
     setActiveTabId(tab.id);
   }, []);
 
   const handleNewShellTab = useCallback(async (shellType: 'powershell' | 'wsl', afterTabId?: string) => {
     const tab = await window.claudeTerminal.createShellTab(shellType, afterTabId);
     if (afterTabId) {
-      // Insert at correct position (onTabUpdate would just append)
       setTabs((prev) => {
         const filtered = prev.filter(t => t.id !== tab.id);
         const afterIdx = filtered.findIndex(t => t.id === afterTabId);
@@ -108,7 +165,7 @@ export default function App() {
 
   const tryShowWorktreeDialog = useCallback(async () => {
     try {
-      await window.claudeTerminal.getCurrentBranch();
+      await window.claudeTerminal.getCurrentBranch(activeProjectIdRef.current ?? undefined);
       setShowWorktreeDialog(true);
     } catch {
       setAlertMessage('Cannot create a worktree: this workspace is not a Git repository, or the repository has no commits yet.');
@@ -117,7 +174,8 @@ export default function App() {
 
   const handleNewTabWithWorktree = useCallback(async (name: string) => {
     try {
-      const tab = await window.claudeTerminal.createTabWithWorktree(name);
+      const projectId = activeProjectIdRef.current ?? '';
+      const tab = await window.claudeTerminal.createTabWithWorktree(projectId, name);
       setActiveTabId(tab.id);
       setShowWorktreeDialog(false);
     } catch (err) {
@@ -125,11 +183,41 @@ export default function App() {
     }
   }, []);
 
-  // Set instance tint color (PID-based hue for multi-window distinction)
-  useEffect(() => {
-    window.claudeTerminal.getInstanceHue().then((hue) => {
-      document.documentElement.style.setProperty('--instance-hue', String(hue));
-    });
+  const handleRemoveProject = useCallback(async (projectId: string) => {
+    try {
+      await window.claudeTerminal.removeProject(projectId);
+      // onProjectRemoved listener handles state cleanup
+    } catch (err) {
+      setAlertMessage(`Failed to remove project: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, []);
+
+  const handleRenameProject = useCallback((projectId: string, name: string) => {
+    setProjects(prev => prev.map(p =>
+      p.id === projectId ? { ...p, displayName: name } : p
+    ));
+  }, []);
+
+  const handleAddProject = useCallback(() => {
+    setShowAddProjectDialog(true);
+  }, []);
+
+  const handleAddProjectConfirm = useCallback(async (dir: string) => {
+    setShowAddProjectDialog(false);
+    try {
+      const config = await window.claudeTerminal.addProject(dir);
+      // Dedup: onProjectAdded listener may have already added it
+      setProjects(prev => {
+        if (prev.some(p => p.id === config.id)) return prev;
+        return [...prev, config];
+      });
+      setActiveProjectId(config.id);
+      // Auto-create first tab for the new project
+      const tab = await window.claudeTerminal.createTab(config.id, null);
+      setActiveTabId(tab.id);
+    } catch (err) {
+      setAlertMessage(`Failed to add project: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }, []);
 
   // Auto-start when a CLI directory was provided (skip StartupDialog)
@@ -145,22 +233,26 @@ export default function App() {
       const savedMode = await window.claudeTerminal.getPermissionMode();
       if (cancelled) return;
 
-      await window.claudeTerminal.startSession(cliDir, savedMode);
+      const result = await window.claudeTerminal.startSession(cliDir, savedMode);
       if (cancelled) return;
+
+      const projectId = result.projectId;
+      const config: ProjectConfig = { id: projectId, dir: cliDir, colorIndex: 0 };
+      setProjects([config]);
+      setActiveProjectId(projectId);
 
       // Check if tabs already exist in the main process (renderer reload)
       const existingTabs = await window.claudeTerminal.getTabs();
       if (cancelled) return;
 
       if (existingTabs.length > 0) {
-        // Renderer reload — reuse existing tabs instead of recreating
         const activeId = await window.claudeTerminal.getActiveTabId();
         if (cancelled) return;
         setTabs(existingTabs);
         setActiveTabId(activeId);
         setAppState('running');
         try {
-          setBranch(await window.claudeTerminal.getCurrentBranch());
+          setBranch(await window.claudeTerminal.getCurrentBranch(projectId));
         } catch { /* not a git repo */ }
         return;
       }
@@ -169,10 +261,9 @@ export default function App() {
       const savedTabs = await window.claudeTerminal.getSavedTabs(cliDir);
       if (cancelled) return;
 
-      // Create all tabs in parallel for faster startup
       await Promise.allSettled(
         savedTabs.map(saved =>
-          window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name)
+          window.claudeTerminal.createTab(projectId, saved.worktree, saved.sessionId, saved.name)
         )
       );
       if (cancelled) return;
@@ -186,18 +277,19 @@ export default function App() {
       setAppState('running');
 
       try {
-        setBranch(await window.claudeTerminal.getCurrentBranch());
+        setBranch(await window.claudeTerminal.getCurrentBranch(projectId));
       } catch { /* not a git repo */ }
 
       if (allTabs.length === 0) {
-        handleNewTabWithoutWorktree();
+        const tab = await window.claudeTerminal.createTab(projectId, null);
+        setActiveTabId(tab.id);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [handleNewTabWithoutWorktree]);
+  }, []);
 
   // Listen for tab updates from main process (registered once)
   useEffect(() => {
@@ -217,7 +309,6 @@ export default function App() {
       destroyTerminal(tabId);
       setTabs((prev) => {
         const remaining = prev.filter((t) => t.id !== tabId);
-        // Update active tab inside the same updater to avoid stale ref reads
         setActiveTabId((prevActive) => {
           if (prevActive === tabId) {
             return remaining.length > 0 ? remaining[0].id : null;
@@ -232,13 +323,15 @@ export default function App() {
       setRemoteInfo(info);
     });
 
-    // Remote client switched tabs — mirror locally
     const cleanupSwitched = window.claudeTerminal.onTabSwitched((tabId) => {
       setActiveTabId(tabId);
     });
 
-    const cleanupBranch = window.claudeTerminal.onBranchChanged((b) => {
-      setBranch(b);
+    const cleanupBranch = window.claudeTerminal.onBranchChanged((b, projectId) => {
+      // Only update branch display if it's for the active project
+      if (!projectId || projectId === activeProjectIdRef.current) {
+        setBranch(b);
+      }
     });
 
     const cleanupHookStatus = window.claudeTerminal.onHookStatus((status: HookExecutionStatus) => {
@@ -252,6 +345,22 @@ export default function App() {
       }
     });
 
+    const cleanupProjectAdded = window.claudeTerminal.onProjectAdded((project) => {
+      setProjects(prev => {
+        if (prev.some(p => p.id === project.id)) return prev;
+        return [...prev, project];
+      });
+    });
+
+    const cleanupProjectRemoved = window.claudeTerminal.onProjectRemoved((projectId) => {
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      setActiveProjectId(prev => prev === projectId ? null : prev);
+    });
+
+    const cleanupProjectSwitch = window.claudeTerminal.onProjectSwitch((projectId) => {
+      setActiveProjectId(projectId);
+    });
+
     return () => {
       cleanupUpdate();
       cleanupRemoved();
@@ -259,24 +368,34 @@ export default function App() {
       cleanupSwitched();
       cleanupBranch();
       cleanupHookStatus();
+      cleanupProjectAdded();
+      cleanupProjectRemoved();
+      cleanupProjectSwitch();
     };
   }, []);
 
-  // Update window title when tabs, workspace, or branch change
+  // Update window title when tabs, active project, or branch change
   useEffect(() => {
-    const title = buildWindowTitle(workspaceDir, tabs, branch);
+    const activeProject = projects.find(p => p.id === activeProjectId);
+    const dir = activeProject?.dir ?? workspaceDir;
+    const title = buildWindowTitle(dir, activeProjectTabs, branch);
     window.claudeTerminal.setWindowTitle(title);
-  }, [tabs, workspaceDir, branch]);
+  }, [activeProjectTabs, activeProjectId, projects, workspaceDir, branch]);
 
-
-
-  // Keyboard shortcuts — use refs to avoid re-registering on every state change
+  // Keyboard shortcuts
   useEffect(() => {
     if (appState !== 'running') return;
 
     const ctx: KeybindingContext = {
       activeTabId: () => activeTabIdRef.current,
-      tabs: () => tabsRef.current,
+      tabs: () => {
+        // When project filtering is active, cycle within project tabs
+        const projectId = activeProjectIdRef.current;
+        if (projectId) {
+          return tabsRef.current.filter(t => t.projectId === projectId);
+        }
+        return tabsRef.current;
+      },
       createNewWindow: () => window.claudeTerminal.createNewWindow(),
       newTab: handleNewTabWithoutWorktree,
       newWorktreeTab: tryShowWorktreeDialog,
@@ -284,13 +403,17 @@ export default function App() {
       closeTab: handleCloseTab,
       selectTab: handleSelectTab,
       renameTab: (id) => setRenamingTabId(id),
+      openProjectSwitcher: () => setShowProjectSwitcher(true),
     };
 
     const handler = (e: KeyboardEvent) => {
       if (isTabJump(e)) {
         e.preventDefault();
+        const projectTabs = activeProjectIdRef.current
+          ? tabsRef.current.filter(t => t.projectId === activeProjectIdRef.current)
+          : tabsRef.current;
         const idx = parseInt(e.key) - 1;
-        if (idx < tabsRef.current.length) handleSelectTab(tabsRef.current[idx].id);
+        if (idx < projectTabs.length) handleSelectTab(projectTabs[idx].id);
         return;
       }
 
@@ -306,22 +429,24 @@ export default function App() {
   }, [appState, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleCloseTab, tryShowWorktreeDialog]);
 
   const handleStartSession = useCallback(async (dir: string, mode: PermissionMode) => {
-    await window.claudeTerminal.startSession(dir, mode);
+    const result = await window.claudeTerminal.startSession(dir, mode);
     setWorkspaceDir(dir);
 
-    // Check for saved tabs from a previous session in this directory
+    const projectId = result.projectId;
+    const config: ProjectConfig = { id: projectId, dir, colorIndex: 0 };
+    setProjects([config]);
+    setActiveProjectId(projectId);
+
     const savedTabs = await window.claudeTerminal.getSavedTabs(dir);
 
     if (savedTabs.length > 0) {
-      // Create all tabs in parallel for faster startup
       await Promise.allSettled(
         savedTabs.map(saved =>
-          window.claudeTerminal.createTab(saved.worktree, saved.sessionId, saved.name)
+          window.claudeTerminal.createTab(projectId, saved.worktree, saved.sessionId, saved.name)
         )
       );
     }
 
-    // Load all tabs (includes any just-created ones)
     const allTabs = await window.claudeTerminal.getTabs();
     const activeId = await window.claudeTerminal.getActiveTabId();
     setTabs(allTabs);
@@ -329,53 +454,66 @@ export default function App() {
     setAppState('running');
 
     try {
-      setBranch(await window.claudeTerminal.getCurrentBranch());
+      setBranch(await window.claudeTerminal.getCurrentBranch(projectId));
     } catch { /* not a git repo */ }
 
-    // Only create a tab if no tabs were restored
     if (allTabs.length === 0) {
-      handleNewTabWithoutWorktree();
+      const tab = await window.claudeTerminal.createTab(projectId, null);
+      setActiveTabId(tab.id);
     }
-  }, [handleNewTabWithoutWorktree]);
+  }, []);
 
   if (appState === 'startup') {
     return (
-      <div className="flex flex-col h-screen border border-[hsl(var(--instance-hue)_40%_25%)]">
+      <div className="flex flex-col h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
         <StartupDialog onStart={handleStartSession} />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen border border-[hsl(var(--instance-hue)_40%_25%)]">
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        renamingTabId={renamingTabId}
-        onSelectTab={handleSelectTab}
-        onCloseTab={handleCloseTab}
-        onRenameTab={handleRenameTab}
-        onRenameHandled={() => setRenamingTabId(null)}
-        onNewClaudeTab={handleNewTabWithoutWorktree}
-        onNewWorktreeTab={tryShowWorktreeDialog}
-        onNewShellTab={handleNewShellTab}
-        onReorderTabs={handleReorderTabs}
-        onManageWorktrees={() => setShowWorktreeManager(true)}
-        onManageHooks={() => setShowHookManager(true)}
-        remoteInfo={remoteInfo}
-        onActivateRemote={handleActivateRemote}
-        onDeactivateRemote={handleDeactivateRemote}
-      />
-      <div className="flex-1 relative overflow-hidden" data-terminal-area>
-        {tabs.map((tab) => (
-          <Terminal
-            key={tab.id}
-            tabId={tab.id}
-            isVisible={tab.id === activeTabId}
-          />
-        ))}
+    <div className="flex flex-row h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
+      {projects.length > 1 && (
+        <ProjectSidebar
+          projects={projects}
+          activeProjectId={activeProjectId ?? ''}
+          tabCounts={tabCounts}
+          onSelectProject={handleSelectProject}
+          onAddProject={handleAddProject}
+          onRemoveProject={handleRemoveProject}
+          onRenameProject={handleRenameProject}
+        />
+      )}
+      <div className="flex flex-col flex-1 min-w-0">
+        <TabBar
+          tabs={activeProjectTabs}
+          activeTabId={activeTabId}
+          renamingTabId={renamingTabId}
+          onSelectTab={handleSelectTab}
+          onCloseTab={handleCloseTab}
+          onRenameTab={handleRenameTab}
+          onRenameHandled={() => setRenamingTabId(null)}
+          onNewClaudeTab={handleNewTabWithoutWorktree}
+          onNewWorktreeTab={tryShowWorktreeDialog}
+          onNewShellTab={handleNewShellTab}
+          onReorderTabs={handleReorderTabs}
+          onManageWorktrees={() => setShowWorktreeManager(true)}
+          onManageHooks={() => setShowHookManager(true)}
+          remoteInfo={remoteInfo}
+          onActivateRemote={handleActivateRemote}
+          onDeactivateRemote={handleDeactivateRemote}
+        />
+        <div className="flex-1 relative overflow-hidden" data-terminal-area>
+          {tabs.map((tab) => (
+            <Terminal
+              key={tab.id}
+              tabId={tab.id}
+              isVisible={tab.id === activeTabId}
+            />
+          ))}
+        </div>
+        <StatusBar tabs={activeProjectTabs} hookStatus={hookStatus} />
       </div>
-      <StatusBar tabs={tabs} hookStatus={hookStatus} />
       {showWorktreeDialog && (
         <WorktreeNameDialog
           onCreateWithWorktree={handleNewTabWithWorktree}
@@ -384,10 +522,11 @@ export default function App() {
       )}
       {showWorktreeManager && (
         <WorktreeManagerDialog
-          tabs={tabs}
+          tabs={activeProjectTabs}
           onClose={() => setShowWorktreeManager(false)}
           onOpenClaude={async (worktreeName) => {
-            const tab = await window.claudeTerminal.createTab(worktreeName);
+            const projectId = activeProjectIdRef.current ?? '';
+            const tab = await window.claudeTerminal.createTab(projectId, worktreeName);
             setActiveTabId(tab.id);
           }}
           onOpenShell={async (shellType, cwd) => {
@@ -411,6 +550,28 @@ export default function App() {
       )}
       {showHookManager && (
         <HookManagerDialog onClose={() => setShowHookManager(false)} />
+      )}
+      {showProjectSwitcher && (
+        <ProjectSwitcherDialog
+          projects={projects.map(p => ({
+            ...p,
+            tabCount: tabCounts[p.id]?.total ?? 0,
+          }))}
+          onSelect={handleSelectProject}
+          onAddProject={() => {
+            setShowProjectSwitcher(false);
+            handleAddProject();
+          }}
+          onCancel={() => setShowProjectSwitcher(false)}
+        />
+      )}
+      {showAddProjectDialog && (
+        <StartupDialog
+          title="Add Project"
+          hidePermissions
+          onStart={(dir) => handleAddProjectConfirm(dir)}
+          onCancel={() => setShowAddProjectDialog(false)}
+        />
       )}
       <Dialog open={!!alertMessage} onOpenChange={() => setAlertMessage(null)}>
         <DialogContent>

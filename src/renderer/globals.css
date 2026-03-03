@@ -61,8 +61,8 @@
   --warning-foreground: #1e1e1e;
   --attention: #ce9178;
 
-  /* Instance tint (set from React via JS) */
-  --instance-hue: 0;
+  /* Project tint (set from React based on active project) */
+  --project-hue: 0;
 }
 
 @layer base {

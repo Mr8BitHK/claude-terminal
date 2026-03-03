@@ -41,11 +41,14 @@ interface Tab {
   cwd: string;          // Working directory path
   pid: number | null;   // PTY process ID
   sessionId: string | null; // Claude session ID (for --resume)
+  projectId: string;    // Project this tab belongs to (see docs/multi-project.md)
 }
 ```
 
+The `projectId` field links every tab to a specific project in the workspace. It is set at creation time by `TabManager.createTab()` and is immutable for the tab's lifetime. When multiple projects are open, the tab bar filters tabs by the active project using this field. See [Multi-Project Workspaces](multi-project.md) for details.
+
 Default naming:
-- Claude tabs: worktree name if set, otherwise `Tab N` (incrementing counter)
+- Claude tabs: worktree name if set, otherwise `New Tab`
 - PowerShell tabs: `PowerShell`
 - WSL tabs: `WSL`
 
@@ -55,9 +58,10 @@ Default naming:
 
 ```
 User action (Ctrl+T, +menu, CLI auto-start)
-  -> renderer calls window.claudeTerminal.createTab(worktree, resumeSessionId?, savedName?)
+  -> renderer calls window.claudeTerminal.createTab(projectId, worktree?, resumeSessionId?, savedName?)
     -> IPC: tab:create
-      -> TabManager.createTab() -- creates Tab object, assigns ID
+      -> Resolve ProjectContext from projectId via ProjectManager
+      -> TabManager.createTab(cwd, worktree, 'claude', savedName, projectId)
       -> HookInstaller.install() -- writes .claude/settings.local.json in tab's cwd
       -> PtyManager.spawn() -- spawns cmd.exe /c claude [...flags]
          Environment vars injected:
@@ -74,9 +78,10 @@ User action (Ctrl+T, +menu, CLI auto-start)
 For shell tabs, the flow is simpler:
 
 ```
-User action (Ctrl+P, Ctrl+L, chevron menu)
+User action (Ctrl+Shift+P, Ctrl+L, chevron menu)
   -> IPC: tab:createShell
-    -> TabManager.createTab(cwd, null, shellType)
+    -> Derive projectId from afterTabId or first project
+    -> TabManager.createTab(cwd, null, shellType, undefined, projectId)
     -> PtyManager.spawnShell() -- spawns powershell.exe or wsl.exe directly
     -> Wire onData/onExit (same as Claude tabs, minus hook infrastructure)
     -> If afterTabId provided: insert tab after the specified tab
@@ -302,8 +307,9 @@ Tab Name 1, Tab Name 2
 
 | File | Role |
 |------|------|
-| `src/shared/types.ts` | `Tab`, `TabStatus`, `TabType`, `PermissionMode`, `SavedTab`, `PERMISSION_FLAGS` |
-| `src/main/tab-manager.ts` | In-memory tab store: create, remove, rename, reorder, status updates |
+| `src/shared/types.ts` | `Tab`, `TabStatus`, `TabType`, `PermissionMode`, `SavedTab`, `ProjectConfig`, `PERMISSION_FLAGS` |
+| `src/main/tab-manager.ts` | In-memory tab store: create, remove, rename, reorder, status updates, project filtering |
+| `src/main/project-manager.ts` | `ProjectManager` — per-project context (worktree, hooks, etc.) used during tab creation |
 | `src/main/pty-manager.ts` | PTY lifecycle: spawn Claude/shell processes, write, resize, kill |
 | `src/main/ipc-handlers.ts` | IPC handler registration: `tab:create`, `tab:close`, `tab:rename`, `tab:reorder`, etc. |
 | `src/main/hook-router.ts` | Routes hook messages to status updates, notifications, and AI naming |
@@ -327,12 +333,13 @@ Tab Name 1, Tab Name 2
 |----------|--------|
 | `Ctrl+T` | New Claude tab (root workspace) |
 | `Ctrl+W` | New Claude tab with worktree (opens name dialog) |
-| `Ctrl+P` | New PowerShell tab |
+| `Ctrl+P` | Open project switcher dialog |
+| `Ctrl+Shift+P` | New PowerShell tab |
 | `Ctrl+L` | New WSL tab |
 | `Ctrl+F4` | Close active tab |
-| `Ctrl+Tab` | Switch to next tab |
-| `Ctrl+Shift+Tab` | Switch to previous tab |
-| `Ctrl+1` through `Ctrl+9` | Jump to tab by position |
+| `Ctrl+Tab` | Switch to next tab (within active project) |
+| `Ctrl+Shift+Tab` | Switch to previous tab (within active project) |
+| `Ctrl+1` through `Ctrl+9` | Jump to tab by position (within active project) |
 | `F2` | Rename active tab |
 | `Ctrl+Enter` | Insert newline in Claude prompt (instead of submitting) |
 | `Right-click` | Copy selection, or paste from clipboard if no selection |

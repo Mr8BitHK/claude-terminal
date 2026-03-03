@@ -3,24 +3,30 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { PermissionMode, RemoteAccessInfo, RepoHookConfig, Tab } from '@shared/types';
+import type { PermissionMode, RemoteAccessInfo, RepoHookConfig, Tab, ProjectConfig } from '@shared/types';
 import { PERMISSION_FLAGS } from '@shared/types';
-import { HookConfigStore } from './hook-config-store';
-import { HookEngine } from './hook-engine';
 import { WorktreeManager } from './worktree-manager';
 import { HookInstaller } from './hook-installer';
+import { ProjectManager, type ProjectContext } from './project-manager';
 import type { TabManager } from './tab-manager';
 import type { PtyManager } from './pty-manager';
 import type { SettingsStore } from './settings-store';
+import type { WorkspaceStore } from './workspace-store';
 import { log } from './logger';
 
 export interface AppState {
+  // New: multi-project workspace support
+  workspaceId: string | null;
+  projectManager: ProjectManager | null;
+
+  // Legacy convenience accessors (point to active project or first project)
   workspaceDir: string | null;
-  permissionMode: PermissionMode;
   worktreeManager: WorktreeManager | null;
   hookInstaller: HookInstaller | null;
-  hookConfigStore: HookConfigStore | null;
-  hookEngine: HookEngine | null;
+  hookConfigStore: import('./hook-config-store').HookConfigStore | null;
+  hookEngine: import('./hook-engine').HookEngine | null;
+
+  permissionMode: PermissionMode;
   mainWindow: { setTitle: (title: string) => void } | null;
   cliStartDir: string | null;
   pipeName: string;
@@ -37,6 +43,7 @@ export interface IpcHandlerDeps {
   tabManager: TabManager;
   ptyManager: PtyManager;
   settings: SettingsStore;
+  workspaceStore: WorkspaceStore;
   state: AppState;
   sendToRenderer: (channel: string, ...args: unknown[]) => void;
   persistSessions: () => void;
@@ -46,8 +53,15 @@ export interface IpcHandlerDeps {
   getRemoteAccessInfo: () => RemoteAccessInfo;
 }
 
+/** Resolve hooksDir based on dev/production mode */
+function resolveHooksDir(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'hooks')
+    : path.join(__dirname, '..', '..', 'src', 'hooks');
+}
+
 export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void; wirePtyToTab: WirePtyToTabFn } {
-  const { tabManager, ptyManager, settings, state } = deps;
+  const { tabManager, ptyManager, settings, workspaceStore, state } = deps;
 
   // Per-tab flow control state for PTY data buffering
   const MAX_BUFFER_BYTES = 5 * 1024 * 1024; // 5 MB cap per tab
@@ -92,71 +106,190 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
 
     deps.sendToRenderer('tab:updated', tab);
     deps.persistSessions();
-    if (state.hookEngine) {
-      state.hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: tab.type });
+
+    // Emit tab:created hook via project context
+    const project = tab.projectId ? state.projectManager?.getProject(tab.projectId) : null;
+    const hookEngine = project?.hookEngine ?? state.hookEngine;
+    if (hookEngine) {
+      hookEngine.emit('tab:created', { contextRoot: cwd, tabId: tab.id, cwd, type: tab.type });
     }
   }
 
-  // Git HEAD watcher — detects branch changes
-  let gitHeadWatcher: fs.FSWatcher | null = null;
-  let gitHeadDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // Git HEAD watchers — one per project
+  const gitHeadWatchers = new Map<string, { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null }>();
 
-  // ---- Session ----
+  function setupGitHeadWatcher(projectId: string, dir: string, worktreeManager: WorktreeManager, hookEngine: import('./hook-engine').HookEngine | null) {
+    // Clean up existing watcher for this project
+    const existing = gitHeadWatchers.get(projectId);
+    if (existing) {
+      if (existing.timer) clearTimeout(existing.timer);
+      existing.watcher.close();
+      gitHeadWatchers.delete(projectId);
+    }
+
+    let lastKnownBranch = '';
+    worktreeManager.getCurrentBranch().then(b => { lastKnownBranch = b; }).catch(() => {});
+
+    const gitHeadPath = path.join(dir, '.git', 'HEAD');
+    if (!fs.existsSync(gitHeadPath)) return;
+
+    const entry: { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null } = {
+      watcher: null!,
+      timer: null,
+    };
+    entry.watcher = fs.watch(gitHeadPath, () => {
+      if (entry.timer) clearTimeout(entry.timer);
+      entry.timer = setTimeout(async () => {
+        try {
+          const branch = await worktreeManager.getCurrentBranch();
+          deps.sendToRenderer('git:branchChanged', branch, projectId);
+          if (branch && hookEngine) {
+            hookEngine.emit('branch:changed', { contextRoot: dir, from: lastKnownBranch, to: branch });
+            lastKnownBranch = branch;
+          }
+        } catch { /* not a git repo or git error */ }
+      }, 1000);
+    });
+    entry.watcher.on('error', () => { /* ignore watch errors */ });
+    gitHeadWatchers.set(projectId, entry);
+  }
+
+  // ---- Workspace / Project ----
+  ipcMain.handle('workspace:init', async (_event, mode: PermissionMode) => {
+    state.permissionMode = mode;
+    await settings.setPermissionMode(mode);
+
+    const hooksDir = resolveHooksDir();
+    log.debug('[workspace:init] hooksDir:', hooksDir);
+
+    state.projectManager = new ProjectManager(hooksDir, (status) => {
+      deps.sendToRenderer('hook:status', status);
+    });
+
+    state.workspaceId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return state.workspaceId;
+  });
+
+  ipcMain.handle('project:add', async (_event, dir: string, id?: string, colorIndex?: number) => {
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+      throw new Error(`Invalid project directory: ${dir}`);
+    }
+    if (!state.projectManager) {
+      // Auto-init if not already initialized (backward compat)
+      const hooksDir = resolveHooksDir();
+      state.projectManager = new ProjectManager(hooksDir, (status) => {
+        deps.sendToRenderer('hook:status', status);
+      });
+      state.workspaceId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    const ctx = state.projectManager.addProject(dir, id, colorIndex);
+    log.init(dir);
+
+    // Install hooks
+    ctx.hookInstaller.install(dir);
+
+    // Set up git HEAD watcher
+    if (ctx.worktreeManager) {
+      setupGitHeadWatcher(ctx.id, dir, ctx.worktreeManager, ctx.hookEngine);
+    }
+
+    // Emit app:started hook
+    ctx.hookEngine.emit('app:started', { contextRoot: dir, cwd: dir });
+
+    // Keep legacy fields pointed at the first (or newly added) project
+    state.workspaceDir = ctx.dir;
+    state.worktreeManager = ctx.worktreeManager;
+    state.hookInstaller = ctx.hookInstaller;
+    state.hookConfigStore = ctx.hookConfigStore;
+    state.hookEngine = ctx.hookEngine;
+
+    await settings.addRecentDir(dir);
+
+    const config: ProjectConfig = { id: ctx.id, dir: ctx.dir, colorIndex: ctx.colorIndex };
+    deps.sendToRenderer('project:added', config);
+    return config;
+  });
+
+  ipcMain.handle('project:remove', async (_event, projectId: string) => {
+    if (!state.projectManager) throw new Error('No workspace initialized');
+    const project = state.projectManager.getProject(projectId);
+    if (!project) throw new Error(`Unknown project: ${projectId}`);
+
+    // Remove all tabs for this project
+    const removedTabs = tabManager.removeTabsByProject(projectId);
+    for (const tab of removedTabs) {
+      ptyManager.kill(tab.id);
+      deps.cleanupNamingFlag(tab.id);
+      deps.sendToRenderer('tab:removed', tab.id);
+    }
+
+    // Clean up git watcher
+    const gw = gitHeadWatchers.get(projectId);
+    if (gw) {
+      if (gw.timer) clearTimeout(gw.timer);
+      gw.watcher.close();
+      gitHeadWatchers.delete(projectId);
+    }
+
+    state.projectManager.removeProject(projectId);
+    deps.sendToRenderer('project:removed', projectId);
+    deps.persistSessions();
+  });
+
+  ipcMain.handle('project:list', async () => {
+    if (!state.projectManager) return [];
+    return state.projectManager.getAllProjects().map(p => ({
+      id: p.id, dir: p.dir, colorIndex: p.colorIndex,
+    } satisfies ProjectConfig));
+  });
+
+  // ---- Legacy session:start (wraps workspace:init + project:add) ----
   ipcMain.handle(
     'session:start',
     async (_event, dir: string, mode: PermissionMode) => {
-      state.workspaceDir = dir;
+      // Initialize workspace
       state.permissionMode = mode;
       await settings.setPermissionMode(mode);
-      log.init(dir);
-      state.worktreeManager = new WorktreeManager(dir);
-      // In dev, __dirname is .vite/build/ — go up to project root.
-      // In production, hooks are copied to resources/hooks/ by forge config.
-      const projectRoot = app.isPackaged
-        ? path.join(process.resourcesPath, 'hooks')
-        : path.join(__dirname, '..', '..', 'src', 'hooks');
-      log.debug('[session:start] __dirname:', __dirname);
-      log.debug('[session:start] hooksDir:', projectRoot);
-      log.debug('[session:start] hooks exist:', fs.existsSync(path.join(projectRoot, 'pipe-send.js')));
-      state.hookInstaller = new HookInstaller(projectRoot);
-      state.hookConfigStore = new HookConfigStore(dir);
-      state.hookEngine = new HookEngine(state.hookConfigStore, (status) => {
+
+      const hooksDir = resolveHooksDir();
+      log.debug('[session:start] hooksDir:', hooksDir);
+      log.debug('[session:start] hooks exist:', fs.existsSync(path.join(hooksDir, 'pipe-send.js')));
+
+      state.projectManager = new ProjectManager(hooksDir, (status) => {
         deps.sendToRenderer('hook:status', status);
       });
+      state.workspaceId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      // Watch .git/HEAD for branch changes
-      if (gitHeadDebounceTimer) { clearTimeout(gitHeadDebounceTimer); gitHeadDebounceTimer = null; }
-      gitHeadWatcher?.close();
-      gitHeadWatcher = null;
-      let lastKnownBranch = '';
-      try { lastKnownBranch = await state.worktreeManager!.getCurrentBranch(); } catch {}
-      const gitHeadPath = path.join(dir, '.git', 'HEAD');
-      if (fs.existsSync(gitHeadPath)) {
-        gitHeadWatcher = fs.watch(gitHeadPath, () => {
-          if (gitHeadDebounceTimer) clearTimeout(gitHeadDebounceTimer);
-          gitHeadDebounceTimer = setTimeout(async () => {
-            try {
-              const branch = await state.worktreeManager?.getCurrentBranch() ?? null;
-              deps.sendToRenderer('git:branchChanged', branch);
-              if (branch && state.hookEngine) {
-                state.hookEngine.emit('branch:changed', { contextRoot: dir, from: lastKnownBranch, to: branch });
-                lastKnownBranch = branch;
-              }
-            } catch { /* not a git repo or git error */ }
-          }, 1000);
-        });
-        gitHeadWatcher.on('error', () => { /* ignore watch errors */ });
+      // Add the single project
+      const ctx = state.projectManager.addProject(dir);
+      log.init(dir);
+      ctx.hookInstaller.install(dir);
+
+      // Legacy fields
+      state.workspaceDir = dir;
+      state.worktreeManager = ctx.worktreeManager;
+      state.hookInstaller = ctx.hookInstaller;
+      state.hookConfigStore = ctx.hookConfigStore;
+      state.hookEngine = ctx.hookEngine;
+
+      // Git HEAD watcher
+      if (ctx.worktreeManager) {
+        setupGitHeadWatcher(ctx.id, dir, ctx.worktreeManager, ctx.hookEngine);
       }
 
-      if (state.hookEngine) {
-        state.hookEngine.emit('app:started', { contextRoot: dir, cwd: dir });
+      if (ctx.hookEngine) {
+        ctx.hookEngine.emit('app:started', { contextRoot: dir, cwd: dir });
       }
+
+      await settings.addRecentDir(dir);
+
+      return { projectId: ctx.id };
     },
   );
 
   ipcMain.handle('session:getSavedTabs', async (_event, dir: string) => {
     const saved = await settings.getSessions(dir);
-    // Filter out worktree tabs whose directories no longer exist
     return saved.filter(tab => {
       if (!tab.worktree) return true;
       const worktreeCwd = path.join(dir, '.claude', 'worktrees', tab.worktree);
@@ -168,24 +301,67 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     });
   });
 
+  // ---- Workspace persistence ----
+  ipcMain.handle('workspace:list', async () => {
+    return workspaceStore.listWorkspaces();
+  });
+
+  ipcMain.handle('workspace:save', async (_event, ws: import('@shared/types').WorkspaceConfig) => {
+    await workspaceStore.saveWorkspace(ws);
+  });
+
+  ipcMain.handle('workspace:delete', async (_event, wsId: string) => {
+    await workspaceStore.deleteWorkspace(wsId);
+  });
+
   // ---- Tabs ----
-  ipcMain.handle('tab:create', async (_event, worktreeName: string | null, resumeSessionId?: string, savedName?: string) => {
-    if (!state.workspaceDir) throw new Error('Session not started');
+  ipcMain.handle('tab:create', async (_event, projectIdOrWorktree: string | null, worktreeNameOrResumeId?: string | null, resumeSessionIdOrSavedName?: string, savedNameArg?: string) => {
+    // Support both new signature (projectId, worktree, resume, savedName)
+    // and old signature (worktree, resume, savedName) for backward compat
+    let projectId: string | undefined;
+    let worktreeName: string | null;
+    let resumeSessionId: string | undefined;
+    let savedName: string | undefined;
+
+    // Detect new vs old signature: if first arg matches a known project ID, use new signature
+    const isNewSignature = projectIdOrWorktree && state.projectManager?.getProject(projectIdOrWorktree);
+    if (isNewSignature) {
+      projectId = projectIdOrWorktree!;
+      worktreeName = (worktreeNameOrResumeId as string | null) ?? null;
+      resumeSessionId = resumeSessionIdOrSavedName;
+      savedName = savedNameArg;
+    } else {
+      // Legacy: first arg is worktreeName
+      worktreeName = projectIdOrWorktree;
+      resumeSessionId = worktreeNameOrResumeId as string | undefined;
+      savedName = resumeSessionIdOrSavedName;
+      // Use first project
+      if (state.projectManager) {
+        const projects = state.projectManager.getAllProjects();
+        if (projects.length > 0) projectId = projects[0].id;
+      }
+    }
+
+    const project = projectId ? state.projectManager?.getProject(projectId) : null;
+    const workDir = project?.dir ?? state.workspaceDir;
+    if (!workDir) throw new Error('Session not started');
+
     const cwd = worktreeName
-      ? path.join(state.workspaceDir, '.claude', 'worktrees', worktreeName)
-      : state.workspaceDir;
+      ? path.join(workDir, '.claude', 'worktrees', worktreeName)
+      : workDir;
     if (worktreeName && !fs.existsSync(cwd)) {
       throw new Error(`Worktree directory no longer exists: ${worktreeName}`);
     }
-    const tab = tabManager.createTab(cwd, worktreeName, 'claude', savedName);
+    const tab = tabManager.createTab(cwd, worktreeName, 'claude', savedName, projectId);
 
     if (savedName) {
       const flagFile = path.join(os.tmpdir(), `claude-terminal-named-${tab.id}`);
       fs.writeFileSync(flagFile, '');
     }
 
-    if (state.hookInstaller) {
-      state.hookInstaller.install(cwd);
+    const installer = project?.hookInstaller ?? state.hookInstaller;
+    if (installer) {
+      installer.install(cwd);
     }
 
     const args: string[] = [...(PERMISSION_FLAGS[state.permissionMode] ?? [])];
@@ -203,17 +379,34 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
       CLAUDE_TERMINAL_TMPDIR: os.tmpdir(),
     };
 
-    const spawnCwd = worktreeName ? state.workspaceDir : cwd;
+    const spawnCwd = worktreeName ? workDir : cwd;
     const proc = ptyManager.spawn(tab.id, spawnCwd, args, extraEnv);
-
-    await settings.addRecentDir(state.workspaceDir);
 
     wirePtyToTab(proc, tab, cwd);
     return tab;
   });
 
-  ipcMain.handle('tab:createWithWorktree', async (_event, worktreeName: string) => {
-    if (!state.workspaceDir || !state.worktreeManager) throw new Error('Session not started');
+  ipcMain.handle('tab:createWithWorktree', async (_event, projectIdOrName: string, worktreeNameArg?: string) => {
+    // Support both: (projectId, worktreeName) and (worktreeName) signatures
+    let projectId: string | undefined;
+    let worktreeName: string;
+
+    const isNewSignature = state.projectManager?.getProject(projectIdOrName);
+    if (isNewSignature && worktreeNameArg) {
+      projectId = projectIdOrName;
+      worktreeName = worktreeNameArg;
+    } else {
+      worktreeName = projectIdOrName;
+      if (state.projectManager) {
+        const projects = state.projectManager.getAllProjects();
+        if (projects.length > 0) projectId = projects[0].id;
+      }
+    }
+
+    const project = projectId ? state.projectManager?.getProject(projectId) : null;
+    const workDir = project?.dir ?? state.workspaceDir;
+    const wtManager = project?.worktreeManager ?? state.worktreeManager;
+    if (!workDir || !wtManager) throw new Error('Session not started');
 
     // ANSI codes for progress display
     const CYAN = '\x1b[36m';
@@ -222,9 +415,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     const DIM = '\x1b[2m';
     const RESET = '\x1b[0m';
 
-    // 1. Create tab immediately so renderer can mount xterm
-    const cwd = path.join(state.workspaceDir, '.claude', 'worktrees', worktreeName);
-    const tab = tabManager.createTab(cwd, worktreeName, 'claude');
+    const cwd = path.join(workDir, '.claude', 'worktrees', worktreeName);
+    const tab = tabManager.createTab(cwd, worktreeName, 'claude', undefined, projectId);
     deps.sendToRenderer('tab:updated', tab);
     deps.persistSessions();
 
@@ -232,11 +424,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
       deps.sendToRenderer('tab:worktreeProgress', tab.id, text);
     };
 
-    // 2. Fire off async worktree creation (don't block the IPC return)
-    const baseBranch = await state.worktreeManager.getCurrentBranch();
+    const baseBranch = await wtManager.getCurrentBranch();
 
     const doSetup = async () => {
-      // Guard: tab may have been closed during the setTimeout delay
       if (!tabManager.getTab(tab.id)) return;
 
       sendProgress(`${CYAN}❯${RESET} Creating worktree "${worktreeName}"...\r\n`);
@@ -244,24 +434,24 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
       sendProgress(`  Path: .claude/worktrees/${worktreeName}\r\n`);
 
       try {
-        await state.worktreeManager!.createAsync(worktreeName, (text) => {
+        await wtManager.createAsync(worktreeName, (text) => {
           sendProgress(`${DIM}${text}${RESET}`);
         });
 
-        // Guard: tab may have been closed while git was running
         if (!tabManager.getTab(tab.id)) return;
 
         sendProgress(`${GREEN}✓${RESET} Worktree created\r\n\r\n`);
 
-        // Fire worktree:created hook (matches standalone worktree:create handler)
-        if (state.hookEngine) {
-          state.hookEngine.emit('worktree:created', { contextRoot: cwd, name: worktreeName, path: cwd, branch: worktreeName });
+        const hookEngine = project?.hookEngine ?? state.hookEngine;
+        if (hookEngine) {
+          hookEngine.emit('worktree:created', { contextRoot: cwd, name: worktreeName, path: cwd, branch: worktreeName });
         }
 
         sendProgress(`${CYAN}❯${RESET} Starting Claude...\r\n`);
 
-        if (state.hookInstaller) {
-          state.hookInstaller.install(cwd);
+        const installer = project?.hookInstaller ?? state.hookInstaller;
+        if (installer) {
+          installer.install(cwd);
         }
 
         const args: string[] = [...(PERMISSION_FLAGS[state.permissionMode] ?? []), '-w', worktreeName];
@@ -272,17 +462,13 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
           CLAUDE_TERMINAL_TMPDIR: os.tmpdir(),
         };
 
-        const proc = ptyManager.spawn(tab.id, state.workspaceDir!, args, extraEnv);
-
-        await settings.addRecentDir(state.workspaceDir!);
-
+        const proc = ptyManager.spawn(tab.id, workDir, args, extraEnv);
         wirePtyToTab(proc, tab, cwd);
       } catch (err) {
         sendProgress(`\r\n${RED}✗${RESET} Failed to create worktree\r\n`);
         if (err instanceof Error) {
           sendProgress(`${RED}${err.message}${RESET}\r\n`);
         }
-        // Bug fix: clean up zombie tab on failure
         if (tabManager.getTab(tab.id)) {
           tabManager.removeTab(tab.id);
           deps.sendToRenderer('tab:removed', tab.id);
@@ -291,26 +477,33 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
       }
     };
 
-    // Small delay so the renderer has time to mount the xterm for this tab,
-    // then begin sending progress
     setTimeout(doSetup, 50);
-
-    // Return tab immediately so renderer can switch to it
     return tab;
   });
 
   ipcMain.handle('tab:createShell', async (_event, shellType: 'powershell' | 'wsl', afterTabId?: string, explicitCwd?: string) => {
-    if (!state.workspaceDir) throw new Error('Session not started');
-
-    let cwd = explicitCwd || state.workspaceDir;
-    if (!explicitCwd && afterTabId) {
+    // Derive project from afterTabId or first project
+    let projectId: string | undefined;
+    if (afterTabId) {
       const parentTab = tabManager.getTab(afterTabId);
-      if (parentTab) {
-        cwd = parentTab.cwd;
-      }
+      if (parentTab) projectId = parentTab.projectId;
+    }
+    if (!projectId && state.projectManager) {
+      const projects = state.projectManager.getAllProjects();
+      if (projects.length > 0) projectId = projects[0].id;
     }
 
-    const tab = tabManager.createTab(cwd, null, shellType);
+    const project = projectId ? state.projectManager?.getProject(projectId) : null;
+    const workDir = project?.dir ?? state.workspaceDir;
+    if (!workDir) throw new Error('Session not started');
+
+    let cwd = explicitCwd || workDir;
+    if (!explicitCwd && afterTabId) {
+      const parentTab = tabManager.getTab(afterTabId);
+      if (parentTab) cwd = parentTab.cwd;
+    }
+
+    const tab = tabManager.createTab(cwd, null, shellType, undefined, projectId);
 
     if (afterTabId) {
       tabManager.removeTab(tab.id);
@@ -318,26 +511,30 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     }
 
     const proc = ptyManager.spawnShell(tab.id, cwd, shellType);
-
     wirePtyToTab(proc, tab, cwd, { alwaysActivate: true });
     return tab;
   });
 
   ipcMain.handle('tab:close', async (_event, tabId: string, removeWorktree?: boolean) => {
     const closingTab = tabManager.getTab(tabId);
-    if (closingTab && state.hookEngine) {
-      state.hookEngine.emit('tab:closed', { contextRoot: closingTab.cwd, tabId, cwd: closingTab.cwd });
+    const project = closingTab?.projectId ? state.projectManager?.getProject(closingTab.projectId) : null;
+    const hookEngine = project?.hookEngine ?? state.hookEngine;
+
+    if (closingTab && hookEngine) {
+      hookEngine.emit('tab:closed', { contextRoot: closingTab.cwd, tabId, cwd: closingTab.cwd });
     }
     ptyManager.kill(tabId);
     flowControl.delete(tabId);
     deps.cleanupNamingFlag(tabId);
     if (removeWorktree) {
       const tab = tabManager.getTab(tabId);
-      if (tab?.worktree && state.worktreeManager) {
+      const wtManager = project?.worktreeManager ?? state.worktreeManager;
+      if (tab?.worktree && wtManager) {
         try {
-          await state.worktreeManager.remove(tab.cwd);
-          if (state.hookEngine) {
-            state.hookEngine.emit('worktree:removed', { contextRoot: state.workspaceDir!, name: path.basename(tab.cwd), path: tab.cwd });
+          await wtManager.remove(tab.cwd);
+          if (hookEngine) {
+            const contextRoot = project?.dir ?? state.workspaceDir ?? tab.cwd;
+            hookEngine.emit('worktree:removed', { contextRoot, name: path.basename(tab.cwd), path: tab.cwd });
           }
         } catch {
           // worktree removal is best-effort
@@ -353,7 +550,6 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
 
   ipcMain.handle('tab:switch', async (_event, tabId: string) => {
     tabManager.setActiveTab(tabId);
-    // Notify remote web clients of the tab switch
     deps.sendToRenderer('tab:switched', tabId);
   });
 
@@ -383,38 +579,64 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
   });
 
   // ---- Worktree ----
-  ipcMain.handle('worktree:create', async (_event, name: string) => {
-    if (!state.worktreeManager) throw new Error('Session not started');
-    const worktreePath = await state.worktreeManager.create(name);
-    // Fire repo hooks (fire-and-forget)
-    // The worktree branch is named after `name` (see WorktreeManager.create)
-    if (state.hookEngine) {
-      state.hookEngine.emit('worktree:created', { contextRoot: worktreePath, name, path: worktreePath, branch: name });
+  ipcMain.handle('worktree:create', async (_event, nameOrProjectId: string, nameArg?: string) => {
+    // Support (projectId, name) and (name) signatures
+    let project: ProjectContext | undefined;
+    let name: string;
+    if (nameArg && state.projectManager?.getProject(nameOrProjectId)) {
+      project = state.projectManager.getProject(nameOrProjectId);
+      name = nameArg;
+    } else {
+      name = nameOrProjectId;
+      if (state.projectManager) {
+        const projects = state.projectManager.getAllProjects();
+        if (projects.length > 0) project = projects[0];
+      }
+    }
+
+    const wtManager = project?.worktreeManager ?? state.worktreeManager;
+    if (!wtManager) throw new Error('Session not started');
+    const worktreePath = await wtManager.create(name);
+
+    const hookEngine = project?.hookEngine ?? state.hookEngine;
+    if (hookEngine) {
+      hookEngine.emit('worktree:created', { contextRoot: worktreePath, name, path: worktreePath, branch: name });
     }
     return worktreePath;
   });
 
-  ipcMain.handle('worktree:currentBranch', async () => {
-    if (!state.worktreeManager) throw new Error('Session not started');
-    return state.worktreeManager.getCurrentBranch();
+  ipcMain.handle('worktree:currentBranch', async (_event, projectId?: string) => {
+    const project = projectId ? state.projectManager?.getProject(projectId) : undefined;
+    const wtManager = project?.worktreeManager ?? state.worktreeManager;
+    if (!wtManager) throw new Error('Session not started');
+    return wtManager.getCurrentBranch();
   });
 
-  ipcMain.handle('worktree:listDetails', async () => {
-    if (!state.worktreeManager) throw new Error('Session not started');
-    return state.worktreeManager.listDetails();
+  ipcMain.handle('worktree:listDetails', async (_event, projectId?: string) => {
+    const project = projectId ? state.projectManager?.getProject(projectId) : undefined;
+    const wtManager = project?.worktreeManager ?? state.worktreeManager;
+    if (!wtManager) throw new Error('Session not started');
+    return wtManager.listDetails();
   });
 
-  ipcMain.handle('worktree:remove', async (_event, worktreePath: string) => {
-    if (!state.worktreeManager) throw new Error('Session not started');
-    await state.worktreeManager.remove(worktreePath);
-    if (state.hookEngine) {
-      state.hookEngine.emit('worktree:removed', { contextRoot: state.workspaceDir!, name: path.basename(worktreePath), path: worktreePath });
+  ipcMain.handle('worktree:remove', async (_event, worktreePath: string, projectId?: string) => {
+    const project = projectId ? state.projectManager?.getProject(projectId) : undefined;
+    const wtManager = project?.worktreeManager ?? state.worktreeManager;
+    if (!wtManager) throw new Error('Session not started');
+    await wtManager.remove(worktreePath);
+
+    const hookEngine = project?.hookEngine ?? state.hookEngine;
+    const contextRoot = project?.dir ?? state.workspaceDir ?? worktreePath;
+    if (hookEngine) {
+      hookEngine.emit('worktree:removed', { contextRoot, name: path.basename(worktreePath), path: worktreePath });
     }
   });
 
-  ipcMain.handle('worktree:checkStatus', async (_event, worktreePath: string) => {
-    if (!state.worktreeManager) throw new Error('Session not started');
-    return state.worktreeManager.checkStatus(worktreePath);
+  ipcMain.handle('worktree:checkStatus', async (_event, worktreePath: string, projectId?: string) => {
+    const project = projectId ? state.projectManager?.getProject(projectId) : undefined;
+    const wtManager = project?.worktreeManager ?? state.worktreeManager;
+    if (!wtManager) throw new Error('Session not started');
+    return wtManager.checkStatus(worktreePath);
   });
 
   // ---- Settings ----
@@ -431,14 +653,28 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
   });
 
   // ---- Hook Config ----
-  ipcMain.handle('hookConfig:load', async () => {
-    if (!state.hookConfigStore) throw new Error('Session not started');
-    return state.hookConfigStore.load();
+  ipcMain.handle('hookConfig:load', async (_event, projectId?: string) => {
+    const project = projectId ? state.projectManager?.getProject(projectId) : undefined;
+    const store = project?.hookConfigStore ?? state.hookConfigStore;
+    if (!store) throw new Error('Session not started');
+    return store.load();
   });
 
-  ipcMain.handle('hookConfig:save', async (_event, config: RepoHookConfig) => {
-    if (!state.hookConfigStore) throw new Error('Session not started');
-    await state.hookConfigStore.save(config);
+  ipcMain.handle('hookConfig:save', async (_event, configOrProjectId: RepoHookConfig | string, configArg?: RepoHookConfig) => {
+    // Support (projectId, config) and (config) signatures
+    let config: RepoHookConfig;
+    let project: ProjectContext | undefined;
+    if (typeof configOrProjectId === 'string' && configArg) {
+      project = state.projectManager?.getProject(configOrProjectId);
+      config = configArg;
+    } else if (typeof configOrProjectId === 'object' && configOrProjectId !== null) {
+      config = configOrProjectId;
+    } else {
+      throw new Error('Invalid arguments for hookConfig:save');
+    }
+    const store = project?.hookConfigStore ?? state.hookConfigStore;
+    if (!store) throw new Error('Session not started');
+    await store.save(config);
   });
 
   // ---- Dialog ----
@@ -465,7 +701,6 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     'pty:resize',
     (_event, tabId: string, cols: number, rows: number) => {
       ptyManager.resize(tabId, cols, rows);
-      // Notify remote web clients so they can match the host terminal size
       deps.sendToRenderer('pty:resized', tabId, cols, rows);
     },
   );
@@ -479,7 +714,6 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     const fc = flowControl.get(tabId);
     if (!fc) return;
     fc.paused = false;
-    // Flush buffered data
     for (const chunk of fc.buffer) {
       deps.sendToRenderer('pty:data', tabId, chunk);
     }
@@ -501,9 +735,6 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
 
   // ---- New window ----
   ipcMain.on('window:createNew', () => {
-    // In dev mode, execPath is the bare Electron binary — pass '.' so it
-    // finds the app entry via package.json (parseCliStartDir already skips '.').
-    // In packaged mode, execPath is the .exe which embeds the entry.
     const args = app.isPackaged ? [] : ['.'];
     spawn(process.execPath, args, { detached: true, stdio: 'ignore' }).unref();
   });
@@ -529,14 +760,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
   // Return cleanup function and wirePtyToTab for external use
   return {
     cleanup: () => {
-      if (gitHeadDebounceTimer) {
-        clearTimeout(gitHeadDebounceTimer);
-        gitHeadDebounceTimer = null;
+      for (const [, entry] of gitHeadWatchers) {
+        if (entry.timer) clearTimeout(entry.timer);
+        entry.watcher.close();
       }
-      if (gitHeadWatcher) {
-        gitHeadWatcher.close();
-        gitHeadWatcher = null;
-      }
+      gitHeadWatchers.clear();
     },
     wirePtyToTab,
   };

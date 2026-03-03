@@ -63,3 +63,45 @@ describe('integration: tab lifecycle', () => {
     expect(manager.getAllTabs()).toHaveLength(3);
   });
 });
+
+describe('integration: multi-project tabs', () => {
+  it('creates tabs in different projects and filters by project', () => {
+    const manager = new TabManager();
+    const t1 = manager.createTab('D:\\dev\\repo-a', null, 'claude', undefined, 'proj-a');
+    const t2 = manager.createTab('D:\\dev\\repo-a', null, 'claude', undefined, 'proj-a');
+    const t3 = manager.createTab('D:\\dev\\repo-b', null, 'claude', undefined, 'proj-b');
+
+    expect(manager.getTabsByProject('proj-a')).toHaveLength(2);
+    expect(manager.getTabsByProject('proj-b')).toHaveLength(1);
+    expect(manager.getAllTabs()).toHaveLength(3);
+
+    expect(t1.projectId).toBe('proj-a');
+    expect(t3.projectId).toBe('proj-b');
+  });
+
+  it('removes tabs by project', () => {
+    const manager = new TabManager();
+    manager.createTab('D:\\dev\\repo-a', null, 'claude', undefined, 'proj-a');
+    manager.createTab('D:\\dev\\repo-a', null, 'claude', undefined, 'proj-a');
+    const t3 = manager.createTab('D:\\dev\\repo-b', null, 'claude', undefined, 'proj-b');
+
+    manager.setActiveTab(t3.id);
+    const removed = manager.removeTabsByProject('proj-a');
+
+    expect(removed).toHaveLength(2);
+    expect(manager.getAllTabs()).toHaveLength(1);
+    expect(manager.getActiveTabId()).toBe(t3.id);
+  });
+
+  it('active tab fallback when active project tabs are removed', () => {
+    const manager = new TabManager();
+    const t1 = manager.createTab('D:\\dev\\repo-a', null, 'claude', undefined, 'proj-a');
+    const t2 = manager.createTab('D:\\dev\\repo-b', null, 'claude', undefined, 'proj-b');
+
+    manager.setActiveTab(t1.id);
+    manager.removeTabsByProject('proj-a');
+
+    // Active tab should fall back to remaining tab
+    expect(manager.getActiveTabId()).toBe(t2.id);
+  });
+});

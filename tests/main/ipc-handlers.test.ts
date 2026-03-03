@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
 
 // Mock logger
 vi.mock('@main/logger', () => ({
-  log: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  log: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn(), init: vi.fn() },
 }));
 
 // Mock WorktreeManager and HookInstaller (constructed inside handlers)
@@ -44,6 +44,49 @@ vi.mock('@main/hook-installer', () => ({
   HookInstaller: vi.fn(function () {
     return {
       install: vi.fn(),
+      uninstall: vi.fn(),
+    };
+  }),
+}));
+
+vi.mock('@main/hook-config-store', () => ({
+  HookConfigStore: vi.fn(function () {
+    return { load: vi.fn(), save: vi.fn() };
+  }),
+}));
+
+vi.mock('@main/hook-engine', () => ({
+  HookEngine: vi.fn(function () {
+    return { emit: vi.fn() };
+  }),
+}));
+
+vi.mock('@main/project-manager', () => ({
+  ProjectManager: vi.fn(function () {
+    const projects = new Map();
+    return {
+      addProject: vi.fn((dir: string) => {
+        const ctx = {
+          id: 'proj-test', dir, colorIndex: 0,
+          worktreeManager: {
+            create: vi.fn(),
+            createAsync: vi.fn(async () => '/test/.claude/worktrees/my-feature'),
+            getCurrentBranch: vi.fn(async () => 'main'),
+            listDetails: vi.fn(),
+            remove: vi.fn(),
+            checkStatus: vi.fn(() => ({ clean: true, changesCount: 0 })),
+          },
+          hookConfigStore: { load: vi.fn(), save: vi.fn() },
+          hookEngine: { emit: vi.fn() },
+          hookInstaller: { install: vi.fn(), uninstall: vi.fn() },
+        };
+        projects.set(ctx.id, ctx);
+        return ctx;
+      }),
+      getProject: vi.fn((id: string) => projects.get(id)),
+      getProjectByDir: vi.fn(),
+      getAllProjects: vi.fn(() => Array.from(projects.values())),
+      removeProject: vi.fn((id: string) => projects.delete(id)),
     };
   }),
 }));
@@ -52,6 +95,7 @@ import { registerIpcHandlers, type IpcHandlerDeps } from '@main/ipc-handlers';
 import type { TabManager } from '@main/tab-manager';
 import type { PtyManager } from '@main/pty-manager';
 import type { SettingsStore } from '@main/settings-store';
+import type { WorkspaceStore } from '@main/workspace-store';
 
 function makeMockDeps(): IpcHandlerDeps {
   const mockProc = {
@@ -62,12 +106,15 @@ function makeMockDeps(): IpcHandlerDeps {
 
   return {
     tabManager: {
-      createTab: vi.fn(() => ({ id: 'tab-1', name: 'Tab 1', cwd: '/test', worktree: null, pid: null, type: 'claude' })),
-      getTab: vi.fn((id: string) => ({ id, name: 'Tab 1', cwd: '/test', worktree: null, pid: null, type: 'claude' })),
+      createTab: vi.fn(() => ({ id: 'tab-1', name: 'Tab 1', cwd: '/test', worktree: null, pid: null, type: 'claude', projectId: '' })),
+      getTab: vi.fn((id: string) => ({ id, name: 'Tab 1', cwd: '/test', worktree: null, pid: null, type: 'claude', projectId: '' })),
       getAllTabs: vi.fn(() => []),
+      getTabsByProject: vi.fn(() => []),
       removeTab: vi.fn(),
+      removeTabsByProject: vi.fn(() => []),
       setActiveTab: vi.fn(),
       rename: vi.fn(),
+      reorderTabs: vi.fn(),
       getActiveTabId: vi.fn(() => 'tab-1'),
       insertTabAfter: vi.fn(),
     } as unknown as TabManager,
@@ -87,7 +134,15 @@ function makeMockDeps(): IpcHandlerDeps {
       getPermissionMode: vi.fn(() => 'bypassPermissions'),
       saveSessions: vi.fn(),
     } as unknown as SettingsStore,
+    workspaceStore: {
+      listWorkspaces: vi.fn(async () => []),
+      getWorkspace: vi.fn(async () => null),
+      saveWorkspace: vi.fn(async () => {}),
+      deleteWorkspace: vi.fn(async () => {}),
+    } as unknown as WorkspaceStore,
     state: {
+      workspaceId: null,
+      projectManager: null,
       workspaceDir: null,
       permissionMode: 'bypassPermissions' as const,
       worktreeManager: null,
@@ -125,9 +180,12 @@ describe('registerIpcHandlers', () => {
 
   it('registers all expected channels', () => {
     const expectedHandlers = [
+      'workspace:init', 'workspace:list', 'workspace:save', 'workspace:delete',
+      'project:add', 'project:remove', 'project:list',
       'session:start', 'session:getSavedTabs',
       'tab:create', 'tab:createWithWorktree', 'tab:createShell', 'tab:close', 'tab:switch', 'tab:rename', 'tab:getAll', 'tab:getActiveId',
       'worktree:create', 'worktree:currentBranch', 'worktree:listDetails', 'worktree:remove', 'worktree:checkStatus',
+      'hookConfig:load', 'hookConfig:save',
       'settings:recentDirs', 'settings:removeRecentDir', 'settings:permissionMode',
       'dialog:selectDirectory', 'cli:getStartDir',
       'remote:activate', 'remote:deactivate', 'remote:getInfo',

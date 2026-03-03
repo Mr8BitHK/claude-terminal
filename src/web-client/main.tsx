@@ -135,7 +135,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
 
   const handleNewClaudeTab = useCallback(async () => {
     try {
-      const tab = await window.claudeTerminal.createTab(null);
+      const tab = await window.claudeTerminal.createTab('', null);
       setActiveTabId(tab.id);
     } catch (err) {
       console.error('Failed to create tab:', err);
@@ -144,7 +144,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
 
   const handleNewWorktreeTab = useCallback(async (name: string) => {
     try {
-      const tab = await window.claudeTerminal.createTabWithWorktree(name);
+      const tab = await window.claudeTerminal.createTabWithWorktree('', name);
       setActiveTabId(tab.id);
       setShowWorktreeDialog(false);
     } catch (err) {

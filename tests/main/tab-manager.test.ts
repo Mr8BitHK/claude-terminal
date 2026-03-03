@@ -13,13 +13,13 @@ describe('TabManager', () => {
     expect(tab.status).toBe('new');
     expect(tab.cwd).toBe('D:\\dev\\MyApp');
     expect(tab.worktree).toBeNull();
-    expect(tab.name).toBe('Tab 1');
+    expect(tab.name).toBe('New Tab');
   });
 
-  it('increments tab names', () => {
+  it('uses New Tab as default name for claude tabs', () => {
     manager.createTab('D:\\dev\\MyApp', null);
     const tab2 = manager.createTab('D:\\dev\\MyApp', null);
-    expect(tab2.name).toBe('Tab 2');
+    expect(tab2.name).toBe('New Tab');
   });
 
   it('uses worktree name as tab name when provided', () => {
@@ -70,10 +70,11 @@ describe('TabManager', () => {
     expect(tab.name).toBe('WSL');
   });
 
-  it('shell tabs do not increment tab counter', () => {
-    manager.createTab('D:\\dev\\A', null, 'powershell');
+  it('shell tabs use shell-specific names', () => {
+    const shell = manager.createTab('D:\\dev\\A', null, 'powershell');
+    expect(shell.name).toBe('PowerShell');
     const claude = manager.createTab('D:\\dev\\B', null);
-    expect(claude.name).toBe('Tab 1');
+    expect(claude.name).toBe('New Tab');
   });
 
   it('inserts tab after the specified tab', () => {
@@ -101,5 +102,42 @@ describe('TabManager', () => {
     expect(manager.getActiveTabId()).toBe(tab1.id);
     manager.setActiveTab(tab2.id);
     expect(manager.getActiveTabId()).toBe(tab2.id);
+  });
+
+  describe('project-scoped operations', () => {
+    it('createTab assigns projectId', () => {
+      const tab = manager.createTab('/test', null, 'claude', undefined, 'proj-1');
+      expect(tab.projectId).toBe('proj-1');
+    });
+
+    it('getTabsByProject returns only tabs for that project', () => {
+      manager.createTab('/a', null, 'claude', undefined, 'proj-1');
+      manager.createTab('/b', null, 'claude', undefined, 'proj-2');
+      manager.createTab('/c', null, 'claude', undefined, 'proj-1');
+
+      const proj1Tabs = manager.getTabsByProject('proj-1');
+      expect(proj1Tabs).toHaveLength(2);
+      expect(proj1Tabs.every(t => t.projectId === 'proj-1')).toBe(true);
+    });
+
+    it('removeTabsByProject removes all tabs for a project', () => {
+      manager.createTab('/a', null, 'claude', undefined, 'proj-1');
+      manager.createTab('/b', null, 'claude', undefined, 'proj-2');
+      manager.createTab('/c', null, 'claude', undefined, 'proj-1');
+
+      const removed = manager.removeTabsByProject('proj-1');
+      expect(removed).toHaveLength(2);
+      expect(manager.getAllTabs()).toHaveLength(1);
+      expect(manager.getAllTabs()[0].projectId).toBe('proj-2');
+    });
+
+    it('removeTabsByProject updates activeTabId if needed', () => {
+      const tab1 = manager.createTab('/a', null, 'claude', undefined, 'proj-1');
+      const tab2 = manager.createTab('/b', null, 'claude', undefined, 'proj-2');
+      manager.setActiveTab(tab1.id);
+
+      manager.removeTabsByProject('proj-1');
+      expect(manager.getActiveTabId()).toBe(tab2.id);
+    });
   });
 });

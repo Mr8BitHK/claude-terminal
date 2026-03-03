@@ -28,6 +28,11 @@ export function createHookRouter(deps: HookRouterDeps) {
       deps.tabManager.setActiveTab(tabId);
       const tab = deps.tabManager.getTab(tabId);
       if (tab) {
+        // Switch to the tab's project first, then to the tab itself
+        if (tab.projectId) {
+          deps.sendToRenderer('tab:projectSwitch', tab.projectId);
+        }
+        deps.sendToRenderer('tab:switched', tabId);
         deps.sendToRenderer('tab:updated', tab);
       }
     });

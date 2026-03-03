@@ -17,8 +17,8 @@ function makeMockDeps(): WebRemoteServerDeps {
 
   return {
     tabManager: {
-      createTab: vi.fn(() => ({ id: 'tab-new', name: 'Tab', cwd: '/test', worktree: null, pid: null, type: 'claude' })),
-      getTab: vi.fn((id: string) => ({ id, name: 'Tab', cwd: '/test', worktree: null, pid: null, type: 'claude' })),
+      createTab: vi.fn(() => ({ id: 'tab-new', name: 'Tab', cwd: '/test', worktree: null, pid: null, type: 'claude', projectId: '' })),
+      getTab: vi.fn((id: string) => ({ id, name: 'Tab', cwd: '/test', worktree: null, pid: null, type: 'claude', projectId: '' })),
       getAllTabs: vi.fn(() => []),
       getActiveTabId: vi.fn(() => null),
       setActiveTab: vi.fn(),

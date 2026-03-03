@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils';
 
 interface StartupDialogProps {
   onStart: (dir: string, mode: PermissionMode) => void;
+  onCancel?: () => void;
+  title?: string;
+  hidePermissions?: boolean;
 }
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string }[] = [
@@ -17,7 +20,7 @@ const PERMISSION_OPTIONS: { value: PermissionMode; label: string }[] = [
   { value: 'default', label: 'Default' },
 ];
 
-export default function StartupDialog({ onStart }: StartupDialogProps) {
+export default function StartupDialog({ onStart, onCancel, title = 'Claude Terminal', hidePermissions }: StartupDialogProps) {
   const [recentDirs, setRecentDirs] = useState<string[]>([]);
   const [selectedDir, setSelectedDir] = useState<string | null>(null);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypassPermissions');
@@ -55,10 +58,10 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
   };
 
   return (
-    <Dialog open>
+    <Dialog open onOpenChange={(open) => { if (!open && onCancel) onCancel(); }}>
       <DialogContent className="max-w-[480px]" onKeyDown={handleKeyDown}>
         <DialogHeader className="text-center">
-          <DialogTitle className="text-xl">Claude Terminal</DialogTitle>
+          <DialogTitle className="text-xl">{title}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
@@ -108,25 +111,27 @@ export default function StartupDialog({ onStart }: StartupDialogProps) {
           </Button>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Permissions
-          </Label>
-          <RadioGroup
-            value={permissionMode}
-            onValueChange={(value) => setPermissionMode(value as PermissionMode)}
-            className="flex gap-4"
-          >
-            {PERMISSION_OPTIONS.map((opt) => (
-              <div key={opt.value} className="flex items-center gap-1.5">
-                <RadioGroupItem value={opt.value} id={`perm-${opt.value}`} />
-                <Label htmlFor={`perm-${opt.value}`} className="text-sm cursor-pointer">
-                  {opt.label}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-        </div>
+        {!hidePermissions && (
+          <div className="flex flex-col gap-2">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Permissions
+            </Label>
+            <RadioGroup
+              value={permissionMode}
+              onValueChange={(value) => setPermissionMode(value as PermissionMode)}
+              className="flex gap-4"
+            >
+              {PERMISSION_OPTIONS.map((opt) => (
+                <div key={opt.value} className="flex items-center gap-1.5">
+                  <RadioGroupItem value={opt.value} id={`perm-${opt.value}`} />
+                  <Label htmlFor={`perm-${opt.value}`} className="text-sm cursor-pointer">
+                    {opt.label}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+        )}
 
         <Button className="w-full" disabled={!selectedDir} onClick={handleStart}>
           Start

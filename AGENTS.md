@@ -20,26 +20,31 @@ src/
   main/           # Electron main process
     index.ts      # App entry: window creation, IPC handlers, lifecycle
     pty-manager.ts    # Spawns/manages node-pty processes per tab
-    tab-manager.ts    # Pure state: tab CRUD, active tab tracking
+    tab-manager.ts    # Pure state: tab CRUD, active tab tracking, project filtering
     ipc-server.ts     # Named pipe server for hook communication
     settings-store.ts # JSON file-based settings persistence
+    project-manager.ts  # Multi-project registry: per-project managers (worktree, hooks, etc.)
+    workspace-store.ts  # Workspace config persistence (JSON files in userData)
     worktree-manager.ts # Git worktree create/remove/list
     hook-installer.ts   # Writes .claude/settings.local.json for hooks
   renderer/        # React renderer process
-    App.tsx        # Root component, state machine (startup/running)
+    App.tsx        # Root component, state machine (startup/running), multi-project state
     globals.css    # Tailwind CSS v4 imports + theme tokens (dark VS Code palette)
+    keybindings.ts # Central keybinding registry (Ctrl+P project switcher, etc.)
     lib/utils.ts   # cn() utility (clsx + tailwind-merge)
     components/    # StartupDialog, TabBar, Tab, Terminal, StatusBar, etc.
+    components/ProjectSidebar.tsx      # Project sidebar: list, status counts, collapse
+    components/ProjectSwitcherDialog.tsx # Quick-switch overlay (Ctrl+P)
     components/ui/ # shadcn/ui primitives (Button, Dialog, DropdownMenu, etc.)
     global.d.ts    # Window.claudeTerminal type augmentation
   shared/
-    types.ts       # Shared types: Tab, TabStatus, PermissionMode, IpcMessage
-  preload.ts       # contextBridge API (18 methods)
+    types.ts       # Shared types: Tab, TabStatus, PermissionMode, ProjectConfig, WorkspaceConfig, IpcMessage
+  preload.ts       # contextBridge API
   hooks/           # Node.js scripts invoked by Claude Code hooks
     pipe-send.js   # Shared helper: sends JSON to named pipe
     on-session-start.js, on-prompt-submit.js, on-tool-use.js,
     on-stop.js, on-notification.js, on-session-end.js
-tests/             # Mirrors src/ structure, 40 tests across 9 files
+tests/             # Mirrors src/ structure
 ```
 
 ## Key Architecture Decisions
@@ -94,6 +99,7 @@ Feature architecture docs live in `docs/`. Start with the overview docs, then di
 | Doc | Contents |
 |-----|----------|
 | [Tab Management](docs/tab-management.md) | Tab types (claude/shell), lifecycle, status state machine, drag-drop, rename, AI auto-naming, permission modes |
+| [Multi-Project Workspaces](docs/multi-project.md) | ProjectManager, sidebar, project switcher, per-project color tinting, workspace persistence |
 | [PTY Management](docs/pty-management.md) | Process spawning (ConPTY), I/O data flow, flow control (backpressure), process termination, resize |
 | [Terminal Rendering](docs/terminal-rendering.md) | xterm.js integration, instance caching, key event filtering, resize handling, flow control, serialization |
 | [Hook System](docs/hooks.md) | Claude Code hook scripts, named pipe IPC, hook installation, message format, event types |
@@ -162,5 +168,8 @@ Documentation must stay in sync with code. When implementing or changing a featu
 - **IPC**: `ipcMain.handle` for request/response, `ipcMain.on` for fire-and-forget (PTY write/resize)
 - **Tab status flow**: `new` -> `working` <-> `idle` / `requires_response` (driven by hooks)
 - **Permission modes**: `default`, `plan`, `acceptEdits`, `bypassPermissions` (maps to CLI flags in `PERMISSION_FLAGS`)
+- **Multi-project**: Tabs carry a `projectId` field. IPC handlers resolve `ProjectContext` from `ProjectManager` for project-scoped operations (worktree, hooks, etc.)
+- **Project color tinting**: CSS variable `--project-hue` set from React based on active project's `PROJECT_COLORS` entry
+- **Keybindings**: Centralized in `src/renderer/keybindings.ts`. `Ctrl+P` opens project switcher, `Ctrl+Shift+P` opens PowerShell
 - **shadcn imports**: `import { Button } from '@/components/ui/button'`, `import { cn } from '@/lib/utils'`
 - **Class composition**: Use `cn()` to merge Tailwind classes conditionally: `cn('base-classes', condition && 'conditional-class')`

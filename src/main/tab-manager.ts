@@ -7,7 +7,7 @@ function generateId(): string {
 export class TabManager {
   private tabs = new Map<string, Tab>();
   private activeTabId: string | null = null;
-  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string): Tab {
+  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string, projectId = ''): Tab {
     const id = generateId();
     let defaultName: string;
     if (type === 'powershell') {
@@ -19,7 +19,7 @@ export class TabManager {
     }
     const name = savedName ?? defaultName;
     const status: TabStatus = type === 'claude' ? 'new' : 'shell';
-    const tab: Tab = { id, type, name, defaultName, status, worktree, cwd, pid: null, sessionId: null };
+    const tab: Tab = { id, type, name, defaultName, status, worktree, cwd, pid: null, sessionId: null, projectId };
     this.tabs.set(id, tab);
     if (!this.activeTabId) {
       this.activeTabId = id;
@@ -100,5 +100,24 @@ export class TabManager {
     if (this.tabs.has(id)) {
       this.activeTabId = id;
     }
+  }
+
+  getTabsByProject(projectId: string): Tab[] {
+    return this.getAllTabs().filter(t => t.projectId === projectId);
+  }
+
+  removeTabsByProject(projectId: string): Tab[] {
+    const removed: Tab[] = [];
+    for (const [id, tab] of this.tabs) {
+      if (tab.projectId === projectId) {
+        removed.push(tab);
+        this.tabs.delete(id);
+      }
+    }
+    if (this.activeTabId && !this.tabs.has(this.activeTabId)) {
+      const remaining = this.getAllTabs();
+      this.activeTabId = remaining.length > 0 ? remaining[0].id : null;
+    }
+    return removed;
   }
 }

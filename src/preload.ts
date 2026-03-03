@@ -1,12 +1,30 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PermissionMode, Tab, SavedTab, RemoteAccessInfo, RepoHookConfig, HookExecutionStatus } from './shared/types';
+import type { PermissionMode, Tab, SavedTab, RemoteAccessInfo, RepoHookConfig, HookExecutionStatus, ProjectConfig, WorkspaceConfig } from './shared/types';
 
 const api = {
+  // Workspace / Project management
+  initWorkspace: (mode: PermissionMode): Promise<string> =>
+    ipcRenderer.invoke('workspace:init', mode),
+  addProject: (dir: string, id?: string, colorIndex?: number): Promise<ProjectConfig> =>
+    ipcRenderer.invoke('project:add', dir, id, colorIndex),
+  removeProject: (projectId: string): Promise<void> =>
+    ipcRenderer.invoke('project:remove', projectId),
+  listProjects: (): Promise<ProjectConfig[]> =>
+    ipcRenderer.invoke('project:list'),
+
+  // Workspace persistence
+  listWorkspaces: (): Promise<WorkspaceConfig[]> =>
+    ipcRenderer.invoke('workspace:list'),
+  saveWorkspace: (ws: WorkspaceConfig): Promise<void> =>
+    ipcRenderer.invoke('workspace:save', ws),
+  deleteWorkspace: (wsId: string): Promise<void> =>
+    ipcRenderer.invoke('workspace:delete', wsId),
+
   // Tab operations
-  createTab: (worktree: string | null, resumeSessionId?: string, savedName?: string): Promise<Tab> =>
-    ipcRenderer.invoke('tab:create', worktree, resumeSessionId, savedName),
-  createTabWithWorktree: (worktreeName: string): Promise<Tab> =>
-    ipcRenderer.invoke('tab:createWithWorktree', worktreeName),
+  createTab: (projectId: string, worktree?: string | null, resumeSessionId?: string, savedName?: string): Promise<Tab> =>
+    ipcRenderer.invoke('tab:create', projectId, worktree ?? null, resumeSessionId, savedName),
+  createTabWithWorktree: (projectId: string, worktreeName: string): Promise<Tab> =>
+    ipcRenderer.invoke('tab:createWithWorktree', projectId, worktreeName),
   createShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string, cwd?: string): Promise<Tab> =>
     ipcRenderer.invoke('tab:createShell', shellType, afterTabId, cwd),
   closeTab: (tabId: string, removeWorktree?: boolean): Promise<void> =>
@@ -33,16 +51,16 @@ const api = {
     ipcRenderer.send('pty:resume', tabId),
 
   // Worktree
-  createWorktree: (name: string): Promise<string> =>
-    ipcRenderer.invoke('worktree:create', name),
-  getCurrentBranch: (): Promise<string> =>
-    ipcRenderer.invoke('worktree:currentBranch'),
-  listWorktreeDetails: (): Promise<{ name: string; path: string; clean: boolean; changesCount: number }[]> =>
-    ipcRenderer.invoke('worktree:listDetails'),
-  removeWorktree: (worktreePath: string): Promise<void> =>
-    ipcRenderer.invoke('worktree:remove', worktreePath),
-  checkWorktreeStatus: (worktreePath: string): Promise<{ clean: boolean; changesCount: number }> =>
-    ipcRenderer.invoke('worktree:checkStatus', worktreePath),
+  createWorktree: (projectId: string, name: string): Promise<string> =>
+    ipcRenderer.invoke('worktree:create', projectId, name),
+  getCurrentBranch: (projectId?: string): Promise<string> =>
+    ipcRenderer.invoke('worktree:currentBranch', projectId),
+  listWorktreeDetails: (projectId?: string): Promise<{ name: string; path: string; clean: boolean; changesCount: number }[]> =>
+    ipcRenderer.invoke('worktree:listDetails', projectId),
+  removeWorktree: (worktreePath: string, projectId?: string): Promise<void> =>
+    ipcRenderer.invoke('worktree:remove', worktreePath, projectId),
+  checkWorktreeStatus: (worktreePath: string, projectId?: string): Promise<{ clean: boolean; changesCount: number }> =>
+    ipcRenderer.invoke('worktree:checkStatus', worktreePath, projectId),
 
   // Settings
   getRecentDirs: (): Promise<string[]> =>
@@ -53,10 +71,10 @@ const api = {
     ipcRenderer.invoke('settings:permissionMode'),
 
   // Hook config
-  getHookConfig: (): Promise<RepoHookConfig> =>
-    ipcRenderer.invoke('hookConfig:load'),
-  saveHookConfig: (config: RepoHookConfig): Promise<void> =>
-    ipcRenderer.invoke('hookConfig:save', config),
+  getHookConfig: (projectId?: string): Promise<RepoHookConfig> =>
+    ipcRenderer.invoke('hookConfig:load', projectId),
+  saveHookConfig: (projectIdOrConfig: string | RepoHookConfig, config?: RepoHookConfig): Promise<void> =>
+    ipcRenderer.invoke('hookConfig:save', projectIdOrConfig, config),
 
   // Hook execution status events
   onHookStatus: (callback: (status: HookExecutionStatus) => void): (() => void) => {
@@ -84,10 +102,10 @@ const api = {
   openExternal: (url: string): void =>
     ipcRenderer.send('shell:openExternal', url),
 
-  // Startup
+  // Startup (legacy — kept for backward compat, wraps workspace:init + project:add)
   selectDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke('dialog:selectDirectory'),
-  startSession: (dir: string, mode: PermissionMode): Promise<void> =>
+  startSession: (dir: string, mode: PermissionMode): Promise<{ projectId: string }> =>
     ipcRenderer.invoke('session:start', dir, mode),
   getSavedTabs: (dir: string): Promise<SavedTab[]> =>
     ipcRenderer.invoke('session:getSavedTabs', dir),
@@ -169,12 +187,39 @@ const api = {
     };
   },
 
-  onBranchChanged: (callback: (branch: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, branch: string) =>
-      callback(branch);
+  onBranchChanged: (callback: (branch: string, projectId?: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, branch: string, projectId?: string) =>
+      callback(branch, projectId);
     ipcRenderer.on('git:branchChanged', handler);
     return () => {
       ipcRenderer.removeListener('git:branchChanged', handler);
+    };
+  },
+
+  onProjectAdded: (callback: (project: ProjectConfig) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, project: ProjectConfig) =>
+      callback(project);
+    ipcRenderer.on('project:added', handler);
+    return () => {
+      ipcRenderer.removeListener('project:added', handler);
+    };
+  },
+
+  onProjectRemoved: (callback: (projectId: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, projectId: string) =>
+      callback(projectId);
+    ipcRenderer.on('project:removed', handler);
+    return () => {
+      ipcRenderer.removeListener('project:removed', handler);
+    };
+  },
+
+  onProjectSwitch: (callback: (projectId: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, projectId: string) =>
+      callback(projectId);
+    ipcRenderer.on('tab:projectSwitch', handler);
+    return () => {
+      ipcRenderer.removeListener('tab:projectSwitch', handler);
     };
   },
 };

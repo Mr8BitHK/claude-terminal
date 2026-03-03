@@ -34,7 +34,7 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarP
   }
 
   return (
-    <div className="flex gap-4 px-3 py-0.5 bg-[hsl(var(--instance-hue)_30%_18%)] text-muted-foreground text-xs min-h-[22px] items-center border-t border-border">
+    <div className="flex gap-4 px-3 py-0.5 bg-[hsl(var(--project-hue)_30%_18%)] text-muted-foreground text-xs min-h-[22px] items-center border-t border-border">
       <div className="flex gap-3 items-center">
         {STATUS_ORDER.map(({ status, label }) => {
           const count = counts.get(status);
@@ -53,7 +53,7 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarP
         </span>
       )}
       <span className="ml-auto">
-        Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P PS | Ctrl+L WSL | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
+        Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P Projects | Ctrl+L WSL | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
       </span>
     </div>
   );
