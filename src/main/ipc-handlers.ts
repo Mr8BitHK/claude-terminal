@@ -60,26 +60,6 @@ function resolveHooksDir(): string {
     : path.join(__dirname, '..', '..', 'src', 'hooks');
 }
 
-/** Helper to get project context from a projectId, falling back to state legacy fields */
-function getProjectContext(state: AppState, projectId?: string): ProjectContext | null {
-  if (projectId && state.projectManager) {
-    return state.projectManager.getProject(projectId) ?? null;
-  }
-  // Fallback: construct a partial context from legacy state
-  if (state.workspaceDir && state.worktreeManager) {
-    return {
-      id: '',
-      dir: state.workspaceDir,
-      colorIndex: 0,
-      worktreeManager: state.worktreeManager,
-      hookConfigStore: state.hookConfigStore!,
-      hookEngine: state.hookEngine!,
-      hookInstaller: state.hookInstaller!,
-    };
-  }
-  return null;
-}
-
 export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void; wirePtyToTab: WirePtyToTabFn } {
   const { tabManager, ptyManager, settings, workspaceStore, state } = deps;
 
@@ -138,7 +118,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
   // Git HEAD watchers — one per project
   const gitHeadWatchers = new Map<string, { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null }>();
 
-  function setupGitHeadWatcher(projectId: string, dir: string, worktreeManager: WorktreeManager, hookEngine: any) {
+  function setupGitHeadWatcher(projectId: string, dir: string, worktreeManager: WorktreeManager, hookEngine: import('./hook-engine').HookEngine | null) {
     // Clean up existing watcher for this project
     const existing = gitHeadWatchers.get(projectId);
     if (existing) {
@@ -153,10 +133,13 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     const gitHeadPath = path.join(dir, '.git', 'HEAD');
     if (!fs.existsSync(gitHeadPath)) return;
 
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const watcher = fs.watch(gitHeadPath, () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(async () => {
+    const entry: { watcher: fs.FSWatcher; timer: ReturnType<typeof setTimeout> | null } = {
+      watcher: null!,
+      timer: null,
+    };
+    entry.watcher = fs.watch(gitHeadPath, () => {
+      if (entry.timer) clearTimeout(entry.timer);
+      entry.timer = setTimeout(async () => {
         try {
           const branch = await worktreeManager.getCurrentBranch();
           deps.sendToRenderer('git:branchChanged', branch, projectId);
@@ -167,8 +150,8 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
         } catch { /* not a git repo or git error */ }
       }, 1000);
     });
-    watcher.on('error', () => { /* ignore watch errors */ });
-    gitHeadWatchers.set(projectId, { watcher, timer: debounceTimer });
+    entry.watcher.on('error', () => { /* ignore watch errors */ });
+    gitHeadWatchers.set(projectId, entry);
   }
 
   // ---- Workspace / Project ----
@@ -188,6 +171,9 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
   });
 
   ipcMain.handle('project:add', async (_event, dir: string, id?: string, colorIndex?: number) => {
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+      throw new Error(`Invalid project directory: ${dir}`);
+    }
     if (!state.projectManager) {
       // Auto-init if not already initialized (backward compat)
       const hooksDir = resolveHooksDir();
@@ -681,8 +667,10 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     if (typeof configOrProjectId === 'string' && configArg) {
       project = state.projectManager?.getProject(configOrProjectId);
       config = configArg;
+    } else if (typeof configOrProjectId === 'object' && configOrProjectId !== null) {
+      config = configOrProjectId;
     } else {
-      config = configOrProjectId as RepoHookConfig;
+      throw new Error('Invalid arguments for hookConfig:save');
     }
     const store = project?.hookConfigStore ?? state.hookConfigStore;
     if (!store) throw new Error('Session not started');

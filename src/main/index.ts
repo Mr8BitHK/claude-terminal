@@ -92,6 +92,9 @@ function sendToRenderer(channel: string, ...args: unknown[]) {
     } else if (channel === 'tab:worktreeProgress') {
       webRemoteServer.broadcast({ type: 'tab:worktreeProgress', tabId: args[0], text: args[1] });
     }
+    // Note: project:added, project:removed, tab:projectSwitch, hook:status, and
+    // git:branchChanged are intentionally NOT forwarded to remote clients.
+    // Project management is a local-only operation.
   }
 }
 

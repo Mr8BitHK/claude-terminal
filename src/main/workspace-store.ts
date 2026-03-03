@@ -19,6 +19,9 @@ export class WorkspaceStore {
   }
 
   private filePath(id: string): string {
+    if (id.includes('..') || path.isAbsolute(id) || id.includes('/') || id.includes('\\')) {
+      throw new Error(`Invalid workspace id: ${id}`);
+    }
     return path.join(this.dir, `${id}.json`);
   }
 

@@ -218,7 +218,7 @@ export default function App() {
     } catch (err) {
       setAlertMessage(`Failed to add project: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [projects.length]);
+  }, []);
 
   // Auto-start when a CLI directory was provided (skip StartupDialog)
   useEffect(() => {
@@ -473,7 +473,7 @@ export default function App() {
 
   return (
     <div className="flex flex-row h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
-      {projects.length > 0 && (
+      {projects.length > 1 && (
         <ProjectSidebar
           projects={projects}
           activeProjectId={activeProjectId ?? ''}
