@@ -310,10 +310,13 @@ export default function App() {
     const cleanupRemoved = window.claudeTerminal.onTabRemoved((tabId) => {
       destroyTerminal(tabId);
       setTabs((prev) => {
+        const closingTab = prev.find((t) => t.id === tabId);
         const remaining = prev.filter((t) => t.id !== tabId);
         setActiveTabId((prevActive) => {
           if (prevActive === tabId) {
-            return remaining.length > 0 ? remaining[0].id : null;
+            if (remaining.length === 0) return null;
+            const sameProject = remaining.filter((t) => t.projectId === closingTab?.projectId);
+            return sameProject.length > 0 ? sameProject[0].id : null;
           }
           return prevActive;
         });
