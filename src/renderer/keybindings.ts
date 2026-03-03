@@ -60,8 +60,6 @@ export const keybindings: Keybinding[] = [
   { mod: 'ctrl',       key: 'F4',         action: (ctx) => { const id = ctx.activeTabId(); if (id) ctx.closeTab(id); } },
   { mod: 'ctrl',       key: 'Tab',        action: (ctx) => cycleTab(ctx, 1) },
   { mod: 'ctrl+shift', key: 'Tab',        action: (ctx) => cycleTab(ctx, -1) },
-  { mod: 'ctrl',       key: 'ArrowRight', action: (ctx) => cycleTab(ctx, 1) },
-  { mod: 'ctrl',       key: 'ArrowLeft',  action: (ctx) => cycleTab(ctx, -1) },
   { mod: 'ctrl',       key: 'ArrowDown',  action: (ctx) => cycleProject(ctx, 1) },
   { mod: 'ctrl',       key: 'ArrowUp',    action: (ctx) => cycleProject(ctx, -1) },
   {                     key: 'F2',         action: (ctx) => { const id = ctx.activeTabId(); if (id) ctx.renameTab(id); } },

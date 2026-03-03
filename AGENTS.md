@@ -154,6 +154,17 @@ Documentation must stay in sync with code. When implementing or changing a featu
 - Use `useRef` for values accessed inside event handlers (avoid stale closures).
 - `useCallback` for handlers passed as props to children.
 
+### Keyboard Shortcuts
+
+- Before adding any new keyboard shortcut, challenge whether the key combination has an existing meaning inside the terminal or Claude Code. Many combos are already claimed:
+  - `Ctrl+ArrowLeft` / `Ctrl+ArrowRight` — jump word left/right in the shell
+  - `Ctrl+ArrowUp` / `Ctrl+ArrowDown` — scroll terminal history (or readline history in some shells)
+  - `Ctrl+A`, `Ctrl+E`, `Ctrl+U`, `Ctrl+K`, `Ctrl+W` — readline editing
+  - `Ctrl+C`, `Ctrl+D`, `Ctrl+Z` — process control signals
+  - `Ctrl+R` — reverse history search
+  - `Ctrl+L` — clear screen (also currently bound to WSL tab in this app — be careful)
+- If a proposed shortcut conflicts with any of the above, raise the conflict with the user before implementing it. Prefer `Ctrl+Shift+*` or `Alt+*` combos for app-level actions, as those are less likely to be consumed by the terminal.
+
 ### Logging
 
 - Use the `log` module (`src/main/logger.ts`), never `console.log`.
