@@ -19,45 +19,53 @@ export function createTabNamer(deps: TabNamerDeps) {
     try { fs.unlinkSync(flagFile); } catch { /* best-effort */ }
   }
 
-  /** Send a prompt to Haiku and apply the result as the tab name. */
-  function callHaikuForName(tabId: string, prompt: string) {
-    const { command: cmd, args: baseArgs } = getClaudeCommand([
-      '-p', '--no-session-persistence', '--model', 'claude-haiku-4-5-20251001',
-    ]);
+  // Queue to serialize Haiku calls — concurrent claude -p invocations get rate-limited
+  let namingQueue = Promise.resolve();
 
-    log.debug('[callHaikuForName] spawning:', cmd, baseArgs.join(' '));
-    const isWindows = process.platform === 'win32';
-    const child = execFile(cmd, baseArgs, { timeout: 30000 }, (err, stdout, stderr) => {
-      if (err) {
-        log.error('[callHaikuForName] FAILED:', err.message);
-        log.error('[callHaikuForName] stderr:', stderr);
-        if (child.pid) {
-          if (isWindows) {
-            try { execFile('taskkill', ['/pid', String(child.pid), '/T', '/F']); } catch { /* best effort */ }
-          } else {
-            child.kill('SIGKILL');
+  /** Send a prompt to Haiku and apply the result as the tab name. Calls are serialized. */
+  function callHaikuForName(tabId: string, prompt: string) {
+    namingQueue = namingQueue.then(() => new Promise<void>((resolve) => {
+      const { command: cmd, args: baseArgs } = getClaudeCommand([
+        '-p', '--no-session-persistence', '--model', 'claude-haiku-4-5-20251001',
+      ]);
+
+      log.debug('[callHaikuForName] spawning:', cmd, baseArgs.join(' '));
+      const isWindows = process.platform === 'win32';
+      const child = execFile(cmd, baseArgs, { timeout: 30000 }, (err, stdout, stderr) => {
+        if (err) {
+          log.error('[callHaikuForName] FAILED:', err.message);
+          log.error('[callHaikuForName] stderr:', stderr);
+          log.error('[callHaikuForName] stdout:', stdout);
+          if (child.pid) {
+            if (isWindows) {
+              try { execFile('taskkill', ['/pid', String(child.pid), '/T', '/F']); } catch { /* best effort */ }
+            } else {
+              child.kill('SIGKILL');
+            }
+          }
+          resolve();
+          return;
+        }
+        log.debug('[callHaikuForName] stdout:', JSON.stringify(stdout));
+
+        const name = stdout.trim().replace(/^["']|["']$/g, '').substring(0, 50);
+        if (name) {
+          const tab = deps.tabManager.getTab(tabId);
+          if (tab) {
+            deps.tabManager.rename(tabId, name);
+            const updated = deps.tabManager.getTab(tabId);
+            if (updated) {
+              deps.sendToRenderer('tab:updated', updated);
+              deps.persistSessions();
+            }
           }
         }
-        return;
-      }
-      log.debug('[callHaikuForName] stdout:', JSON.stringify(stdout));
+        resolve();
+      });
 
-      const name = stdout.trim().replace(/^["']|["']$/g, '').substring(0, 50);
-      if (!name) return;
-
-      const tab = deps.tabManager.getTab(tabId);
-      if (!tab) return;
-
-      deps.tabManager.rename(tabId, name);
-      const updated = deps.tabManager.getTab(tabId);
-      if (updated) {
-        deps.sendToRenderer('tab:updated', updated);
-        deps.persistSessions();
-      }
-    });
-
-    child.stdin?.write(prompt);
-    child.stdin?.end();
+      child.stdin?.write(prompt);
+      child.stdin?.end();
+    }));
   }
 
   function generateTabName(tabId: string, prompt: string) {
