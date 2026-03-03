@@ -473,7 +473,7 @@ export default function App() {
 
   return (
     <div className="flex flex-row h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
-      {projects.length > 1 && (
+      {projects.length > 0 && (
         <ProjectSidebar
           projects={projects}
           activeProjectId={activeProjectId ?? ''}
