@@ -31,7 +31,7 @@ vi.mock('@main/worktree-manager', () => ({
   WorktreeManager: vi.fn(function () {
     return {
       create: vi.fn(),
-      createAsync: vi.fn(async () => '/test/.claude/worktrees/my-feature'),
+      createAsync: vi.fn(async () => ({ path: '/test/.claude/worktrees/my-feature', sourceBranch: 'main' })),
       getCurrentBranch: vi.fn(() => 'main'),
       listDetails: vi.fn(),
       remove: vi.fn(),
@@ -70,7 +70,7 @@ vi.mock('@main/project-manager', () => ({
           id: 'proj-test', dir, colorIndex: 0,
           worktreeManager: {
             create: vi.fn(),
-            createAsync: vi.fn(async () => '/test/.claude/worktrees/my-feature'),
+            createAsync: vi.fn(async () => ({ path: '/test/.claude/worktrees/my-feature', sourceBranch: 'main' })),
             getCurrentBranch: vi.fn(async () => 'main'),
             listDetails: vi.fn(),
             remove: vi.fn(),
@@ -372,7 +372,7 @@ describe('registerIpcHandlers', () => {
       expect(deps.state.hookEngine!.emit).toHaveBeenCalledWith('worktree:created', expect.objectContaining({
         name: 'my-feature',
         branch: 'my-feature',
-      }));
+      }), expect.any(Function));
       expect(deps.state.hookEngine!.emit).toHaveBeenCalledWith('tab:created', expect.objectContaining({
         tabId: 'tab-1',
         type: 'claude',

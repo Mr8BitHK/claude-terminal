@@ -6,6 +6,11 @@ vi.mock('child_process', () => ({
   execFile: vi.fn(),
 }));
 
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, readFileSync: vi.fn(() => { throw new Error('ENOENT'); }), writeFileSync: vi.fn() };
+});
+
 import { WorktreeManager } from '@main/worktree-manager';
 
 describe('WorktreeManager.listDetails', () => {
@@ -41,7 +46,7 @@ describe('WorktreeManager.listDetails', () => {
 
     const result = await manager.listDetails();
     expect(result).toEqual([
-      { name: 'feat-a', path: '/fake/root/.claude/worktrees/feat-a', clean: true, changesCount: 0 },
+      { name: 'feat-a', path: '/fake/root/.claude/worktrees/feat-a', clean: true, changesCount: 0, sourceBranch: null },
     ]);
   });
 
@@ -53,7 +58,7 @@ describe('WorktreeManager.listDetails', () => {
 
     const result = await manager.listDetails();
     expect(result).toEqual([
-      { name: 'bugfix', path: '/fake/root/.claude/worktrees/bugfix', clean: false, changesCount: 3 },
+      { name: 'bugfix', path: '/fake/root/.claude/worktrees/bugfix', clean: false, changesCount: 3, sourceBranch: null },
     ]);
   });
 

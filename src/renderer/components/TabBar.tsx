@@ -92,25 +92,27 @@ export default function TabBar({
       'flex bg-[hsl(var(--project-hue)_30%_18%)] border-b border-border min-h-[36px] items-center px-1 [-webkit-app-region:drag]',
       isDragging && '[-webkit-app-region:no-drag]'
     )}>
-      {tabs.map((tab, index) => (
-        <Tab
-          key={tab.id}
-          tab={tab}
-          index={index}
-          isActive={tab.id === activeTabId}
-          isRenaming={tab.id === renamingTabId}
-          onSelect={onSelectTab}
-          onClose={onCloseTab}
-          onRename={onRenameTab}
-          onRenameHandled={onRenameHandled}
-          onOpenShell={tab.type === 'claude' ? onNewShellTab : undefined}
-          isDragOver={dragOverTabId === tab.id}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onDragEnd={handleDragEnd}
-        />
-      ))}
+      <div className="flex flex-1 min-w-0 overflow-hidden items-center">
+        {tabs.map((tab, index) => (
+          <Tab
+            key={tab.id}
+            tab={tab}
+            index={index}
+            isActive={tab.id === activeTabId}
+            isRenaming={tab.id === renamingTabId}
+            onSelect={onSelectTab}
+            onClose={onCloseTab}
+            onRename={onRenameTab}
+            onRenameHandled={onRenameHandled}
+            onOpenShell={tab.type === 'claude' ? onNewShellTab : undefined}
+            isDragOver={dragOverTabId === tab.id}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+          />
+        ))}
+      </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="text-muted-foreground hover:text-foreground text-xl px-3 py-1 [-webkit-app-region:no-drag]" title="New tab">

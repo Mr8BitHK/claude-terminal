@@ -80,7 +80,7 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
     <div
       ref={tabRef}
       className={cn(
-        'flex items-center gap-1.5 px-3 py-1.5 cursor-pointer border-r border-border text-[13px] select-none [-webkit-app-region:no-drag]',
+        'flex items-center gap-1.5 px-3 py-1.5 cursor-pointer border-r border-border text-[13px] select-none [-webkit-app-region:no-drag] shrink min-w-0 max-w-[200px]',
         isActive && 'bg-[hsl(var(--project-hue)_45%_30%)] outline outline-1 outline-[#c9d1d9] font-semibold',
         !isActive && 'hover:bg-[hsl(var(--project-hue)_20%_24%)]',
         isDragOver && 'border-l-2 border-l-primary'
@@ -115,13 +115,15 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
             onBlur={commitRename}
           />
         ) : (
-          <span className="truncate">
+          <span className="truncate" title={tab.name}>
             {index < 9 && <span className="text-muted-foreground mr-1 text-[11px]">{index + 1}</span>}
             {tab.name}
           </span>
         )}
         {tab.worktree && (
-          <span className="text-[10px] text-muted-foreground truncate">{tab.worktree}</span>
+          <span className="text-[10px] text-muted-foreground truncate" title={tab.sourceBranch ? `${tab.worktree} ← ${tab.sourceBranch}` : tab.worktree}>
+            {tab.sourceBranch ? <>{tab.worktree} <span className="opacity-50">← {tab.sourceBranch}</span></> : tab.worktree}
+          </span>
         )}
       </div>
       {tab.type === 'claude' && onOpenShell && (

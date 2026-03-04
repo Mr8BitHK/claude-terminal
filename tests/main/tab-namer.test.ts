@@ -96,11 +96,14 @@ describe('generateTabName', () => {
     expect(deps.persistSessions).toHaveBeenCalled();
   });
 
-  it('writes prompt to stdin', () => {
+  it('writes prompt to stdin', async () => {
     const deps = makeMockDeps();
     const { generateTabName } = createTabNamer(deps);
 
     generateTabName('tab-1', 'Hello world');
+
+    // callHaikuForName runs inside a .then() — flush the microtask queue
+    await new Promise(r => setTimeout(r, 0));
 
     expect(mockStdin.write).toHaveBeenCalledWith(
       expect.stringContaining('Hello world'),

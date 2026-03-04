@@ -1,4 +1,5 @@
 import { execFile, spawn, ExecFileOptions } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 function execFileAsync(
@@ -24,6 +25,8 @@ export interface WorktreeDetails {
   path: string;
   clean: boolean;
   changesCount: number;
+  /** The branch this worktree was created from. */
+  sourceBranch: string | null;
 }
 
 export class WorktreeManager {
@@ -42,7 +45,7 @@ export class WorktreeManager {
     return stdout.trim();
   }
 
-  async create(name: string): Promise<string> {
+  async create(name: string): Promise<{ path: string; sourceBranch: string }> {
     const worktreePath = path.join(this.rootDir, '.claude', 'worktrees', name);
     const branch = await this.getCurrentBranch();
     await execFileAsync(
@@ -50,10 +53,12 @@ export class WorktreeManager {
       ['worktree', 'add', worktreePath, '-b', name, branch],
       { cwd: this.rootDir, encoding: 'utf-8' },
     );
-    return worktreePath;
+    // Store source branch metadata
+    try { fs.writeFileSync(path.join(worktreePath, '.source-branch'), branch, 'utf-8'); } catch { /* ignore */ }
+    return { path: worktreePath, sourceBranch: branch };
   }
 
-  async createAsync(name: string, onOutput: (text: string) => void): Promise<string> {
+  async createAsync(name: string, onOutput: (text: string) => void): Promise<{ path: string; sourceBranch: string }> {
     const worktreePath = path.join(this.rootDir, '.claude', 'worktrees', name);
     const branch = await this.getCurrentBranch();
 
@@ -73,7 +78,9 @@ export class WorktreeManager {
 
       proc.on('close', (code) => {
         if (code === 0) {
-          resolve(worktreePath);
+          // Store source branch metadata
+          try { fs.writeFileSync(path.join(worktreePath, '.source-branch'), branch, 'utf-8'); } catch { /* ignore */ }
+          resolve({ path: worktreePath, sourceBranch: branch });
         } else {
           reject(new Error(`git worktree add failed with exit code ${code}`));
         }
@@ -147,11 +154,16 @@ export class WorktreeManager {
           // worktree may be in a broken state
         }
         const lines = statusOutput.trim().split('\n').filter(Boolean);
+        let sourceBranch: string | null = null;
+        try {
+          sourceBranch = fs.readFileSync(path.join(wt.path, '.source-branch'), 'utf-8').trim() || null;
+        } catch { /* file may not exist for older worktrees */ }
         return {
           name,
           path: wt.path,
           clean: lines.length === 0,
           changesCount: lines.length,
+          sourceBranch,
         };
       }),
     );

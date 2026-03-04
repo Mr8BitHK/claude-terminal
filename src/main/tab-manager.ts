@@ -7,7 +7,7 @@ function generateId(): string {
 export class TabManager {
   private tabs = new Map<string, Tab>();
   private activeTabId: string | null = null;
-  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string, projectId = ''): Tab {
+  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string, projectId = '', sourceBranch: string | null = null): Tab {
     const id = generateId();
     let defaultName: string;
     if (type === 'powershell') {
@@ -19,7 +19,7 @@ export class TabManager {
     }
     const name = savedName ?? defaultName;
     const status: TabStatus = type === 'claude' ? 'new' : 'shell';
-    const tab: Tab = { id, type, name, defaultName, status, worktree, cwd, pid: null, sessionId: null, projectId };
+    const tab: Tab = { id, type, name, defaultName, status, worktree, sourceBranch, cwd, pid: null, sessionId: null, projectId };
     this.tabs.set(id, tab);
     if (!this.activeTabId) {
       this.activeTabId = id;

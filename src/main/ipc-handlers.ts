@@ -353,7 +353,12 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     if (worktreeName && !fs.existsSync(cwd)) {
       throw new Error(`Worktree directory no longer exists: ${worktreeName}`);
     }
-    const tab = tabManager.createTab(cwd, worktreeName, 'claude', savedName, projectId);
+    // Read source branch metadata for worktree tabs
+    let sourceBranch: string | null = null;
+    if (worktreeName) {
+      try { sourceBranch = fs.readFileSync(path.join(cwd, '.source-branch'), 'utf-8').trim() || null; } catch { /* ignore */ }
+    }
+    const tab = tabManager.createTab(cwd, worktreeName, 'claude', savedName, projectId, sourceBranch);
 
     if (savedName) {
       const flagFile = path.join(os.tmpdir(), `claude-terminal-named-${tab.id}`);
@@ -368,6 +373,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     const args: string[] = [...(PERMISSION_FLAGS[state.permissionMode] ?? [])];
     if (worktreeName) {
       args.push('-w', worktreeName);
+      args.push('--append-system-prompt', `IMPORTANT: You are working in a git worktree. Your working directory is "${cwd}". Only read and modify files within this directory. Do NOT access or modify files in the parent repository at "${workDir}".`);
     }
     if (resumeSessionId) {
       args.push('--resume', resumeSessionId);
@@ -417,15 +423,14 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     const RESET = '\x1b[0m';
 
     const cwd = path.join(workDir, '.claude', 'worktrees', worktreeName);
-    const tab = tabManager.createTab(cwd, worktreeName, 'claude', undefined, projectId);
+    const baseBranch = await wtManager.getCurrentBranch();
+    const tab = tabManager.createTab(cwd, worktreeName, 'claude', undefined, projectId, baseBranch);
     deps.sendToRenderer('tab:updated', tab);
     deps.persistSessions();
 
     const sendProgress = (text: string) => {
       deps.sendToRenderer('tab:worktreeProgress', tab.id, text);
     };
-
-    const baseBranch = await wtManager.getCurrentBranch();
 
     const doSetup = async () => {
       if (!tabManager.getTab(tab.id)) return;
@@ -459,7 +464,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
           installer.install(cwd);
         }
 
-        const args: string[] = [...(PERMISSION_FLAGS[state.permissionMode] ?? []), '-w', worktreeName];
+        const args: string[] = [
+          ...(PERMISSION_FLAGS[state.permissionMode] ?? []),
+          '-w', worktreeName,
+          '--append-system-prompt', `IMPORTANT: You are working in a git worktree. Your working directory is "${cwd}". Only read and modify files within this directory. Do NOT access or modify files in the parent repository at "${workDir}".`,
+        ];
 
         const extraEnv: Record<string, string> = {
           CLAUDE_TERMINAL_TAB_ID: tab.id,

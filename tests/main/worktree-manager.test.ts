@@ -2,11 +2,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import path from 'path';
 import { execFile, spawn } from 'child_process';
+import fs from 'fs';
 
 vi.mock('child_process', () => ({
   execFile: vi.fn(),
   spawn: vi.fn(),
 }));
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, writeFileSync: vi.fn(), readFileSync: vi.fn() };
+});
 
 import { WorktreeManager } from '@main/worktree-manager';
 
@@ -47,7 +53,8 @@ describe('WorktreeManager', () => {
       expect.anything(),
       expect.any(Function),
     );
-    expect(result).toContain(path.join('feature', 'auth'));
+    expect(result.path).toContain(path.join('feature', 'auth'));
+    expect(result.sourceBranch).toBe('main');
   });
 
   it('checkStatus returns clean for worktree with no changes', async () => {
@@ -118,7 +125,8 @@ describe('WorktreeManager', () => {
       closeCb(0);
 
       const result = await promise;
-      expect(result).toContain(path.join('.claude', 'worktrees', 'my-feature'));
+      expect(result.path).toContain(path.join('.claude', 'worktrees', 'my-feature'));
+      expect(result.sourceBranch).toBe('main');
       expect(onOutput).toHaveBeenCalledWith('Preparing worktree');
       expect(mockSpawn).toHaveBeenCalledWith(
         'git',

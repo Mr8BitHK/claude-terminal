@@ -11,6 +11,8 @@ export interface Tab {
   defaultName: string;
   status: TabStatus;
   worktree: string | null;
+  /** The branch this worktree was created from (e.g. "main", "gcai"). */
+  sourceBranch: string | null;
   cwd: string;
   pid: number | null;
   sessionId: string | null;
@@ -21,6 +23,7 @@ export interface SavedTab {
   name: string;
   cwd: string;
   worktree: string | null;
+  sourceBranch: string | null;
   sessionId: string;
 }
 

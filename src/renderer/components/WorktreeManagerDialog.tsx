@@ -11,6 +11,7 @@ interface WorktreeDetail {
   path: string;
   clean: boolean;
   changesCount: number;
+  sourceBranch: string | null;
 }
 
 interface WorktreeManagerDialogProps {
@@ -72,6 +73,7 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>From</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Changes</TableHead>
                 <TableHead>Open</TableHead>
@@ -84,6 +86,7 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
                 return (
                   <TableRow key={wt.path}>
                     <TableCell className="font-medium">{wt.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{wt.sourceBranch ?? '—'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={wt.clean
                         ? 'bg-[#1e3a1e] text-success border-0'

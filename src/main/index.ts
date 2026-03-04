@@ -115,6 +115,7 @@ async function doPersistSessions() {
           name: t.name,
           cwd: t.cwd,
           worktree: t.worktree,
+          sourceBranch: t.sourceBranch,
           sessionId: t.sessionId!,
         }));
       if (savedTabs.length === 0 && claudeTabs.length > 0) {
