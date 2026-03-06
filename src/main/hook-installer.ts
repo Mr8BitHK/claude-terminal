@@ -12,11 +12,16 @@ export class HookInstaller {
   private isOurHook(entry: any): boolean {
     return entry?.hooks?.some((h: any) => {
       if (typeof h.command !== 'string') return false;
-      // Match current hooksDir or any older versioned ClaudeTerminal path
-      // e.g. ...\ClaudeTerminal\app-1.4.1\resources\hooks\on-stop.js
+      // Match current hooksDir, or known ClaudeTerminal packaged paths.
+      // Windows: ...\ClaudeTerminal\app-1.4.1\resources\hooks\on-stop.js
+      // Linux (correct): .../claude-terminal/resources/hooks/on-stop.js
+      // Linux (broken, pre-fix): /usr/lib/hooks/on-stop.js
+      // All our hooks use: node "<path>/on-<event>.js"
       return (
         h.command.includes(this.hooksDir) ||
-        /ClaudeTerminal[\\/]app-[\d.]+[\\/]resources[\\/]hooks[\\/]/.test(h.command)
+        /ClaudeTerminal[\\/]app-[\d.]+[\\/]resources[\\/]hooks[\\/]/.test(h.command) ||
+        /claude-terminal[\\/]resources[\\/]hooks[\\/]/.test(h.command) ||
+        /^node ".*[\\/]hooks[\\/]on-(?:session-start|prompt-submit|tool-use|stop|notification|session-end)\.js"$/.test(h.command)
       );
     }) ?? false;
   }
