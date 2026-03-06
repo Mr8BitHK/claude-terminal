@@ -1,4 +1,5 @@
 import { Tab, TabStatus, TabType } from '@shared/types';
+import { getShellOption } from '@shared/platform';
 
 function generateId(): string {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -7,19 +8,18 @@ function generateId(): string {
 export class TabManager {
   private tabs = new Map<string, Tab>();
   private activeTabId: string | null = null;
-  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string, projectId = ''): Tab {
+  createTab(cwd: string, worktree: string | null, type: TabType = 'claude', savedName?: string, projectId = '', shellType?: string): Tab {
     const id = generateId();
     let defaultName: string;
-    if (type === 'powershell') {
-      defaultName = 'PowerShell';
-    } else if (type === 'wsl') {
-      defaultName = 'WSL';
+    if (type === 'shell' && shellType) {
+      const option = getShellOption(process.platform, shellType);
+      defaultName = option?.defaultName ?? 'Shell';
     } else {
       defaultName = worktree ?? 'New Tab';
     }
     const name = savedName ?? defaultName;
     const status: TabStatus = type === 'claude' ? 'new' : 'shell';
-    const tab: Tab = { id, type, name, defaultName, status, worktree, cwd, pid: null, sessionId: null, projectId };
+    const tab: Tab = { id, type, name, defaultName, status, worktree, cwd, shellType: shellType ?? null, pid: null, sessionId: null, projectId };
     this.tabs.set(id, tab);
     if (!this.activeTabId) {
       this.activeTabId = id;

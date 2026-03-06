@@ -1,7 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { PermissionMode, Tab, SavedTab, RemoteAccessInfo, RepoHookConfig, HookExecutionStatus, ProjectConfig, WorkspaceConfig } from './shared/types';
+import type { ShellOption } from './shared/platform';
 
 const api = {
+  // Platform info
+  platform: process.platform,
+  getAvailableShells: (): Promise<ShellOption[]> =>
+    ipcRenderer.invoke('shell:getAvailable'),
+
   // Workspace / Project management
   initWorkspace: (mode: PermissionMode): Promise<string> =>
     ipcRenderer.invoke('workspace:init', mode),
@@ -25,7 +31,7 @@ const api = {
     ipcRenderer.invoke('tab:create', projectId, worktree ?? null, resumeSessionId, savedName),
   createTabWithWorktree: (projectId: string, worktreeName: string): Promise<Tab> =>
     ipcRenderer.invoke('tab:createWithWorktree', projectId, worktreeName),
-  createShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string, cwd?: string): Promise<Tab> =>
+  createShellTab: (shellType: string, afterTabId?: string, cwd?: string): Promise<Tab> =>
     ipcRenderer.invoke('tab:createShell', shellType, afterTabId, cwd),
   closeTab: (tabId: string, removeWorktree?: boolean): Promise<void> =>
     ipcRenderer.invoke('tab:close', tabId, removeWorktree),

@@ -1,6 +1,6 @@
 export type TabStatus = 'new' | 'working' | 'idle' | 'requires_response' | 'shell';
 
-export type TabType = 'claude' | 'powershell' | 'wsl';
+export type TabType = 'claude' | 'shell';
 
 export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions';
 
@@ -12,6 +12,7 @@ export interface Tab {
   status: TabStatus;
   worktree: string | null;
   cwd: string;
+  shellType: string | null;
   pid: number | null;
   sessionId: string | null;
   projectId: string;

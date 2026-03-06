@@ -16,6 +16,7 @@ describe('shared types', () => {
       status: 'new',
       worktree: null,
       cwd: '/some/path',
+      shellType: null,
       pid: null,
       sessionId: null,
       projectId: 'proj-1',
