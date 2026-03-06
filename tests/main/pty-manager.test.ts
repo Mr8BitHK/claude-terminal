@@ -55,10 +55,16 @@ describe('PtyManager', () => {
     expect(mockPty.resize).toHaveBeenCalledWith(120, 40);
   });
 
-  it('spawns a shell process directly', () => {
-    manager.spawnShell('tab-2', 'D:\\dev\\MyApp', 'powershell');
+  it('spawns a shell process using platform config', () => {
+    const isWindows = process.platform === 'win32';
+    const isDarwin = process.platform === 'darwin';
+    // First shell option: powershell on Windows, zsh on macOS, bash on Linux
+    const shellId = isWindows ? 'powershell' : isDarwin ? 'zsh' : 'bash';
+    const expectedCmd = isWindows ? 'powershell.exe' : isDarwin ? '/bin/zsh' : '/bin/bash';
+
+    manager.spawnShell('tab-2', 'D:\\dev\\MyApp', shellId);
     expect(pty.spawn).toHaveBeenCalledWith(
-      'powershell.exe',
+      expectedCmd,
       [],
       expect.objectContaining({
         cwd: 'D:\\dev\\MyApp',
@@ -66,15 +72,9 @@ describe('PtyManager', () => {
     );
   });
 
-  it('spawns wsl process', () => {
-    manager.spawnShell('tab-3', 'D:\\dev\\MyApp', 'wsl');
-    expect(pty.spawn).toHaveBeenCalledWith(
-      'wsl.exe',
-      [],
-      expect.objectContaining({
-        cwd: 'D:\\dev\\MyApp',
-      }),
-    );
+  it('throws for unknown shell type', () => {
+    expect(() => manager.spawnShell('tab-3', 'D:\\dev\\MyApp', 'nonexistent'))
+      .toThrow('Unknown shell type: nonexistent');
   });
 
   it('kills and removes PTY', () => {

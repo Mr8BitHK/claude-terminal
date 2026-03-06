@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Tab as TabType, RemoteAccessInfo } from '../../shared/types';
+import { useShellOptions } from '../shell-context';
 import Tab from './Tab';
 import HamburgerMenu from './HamburgerMenu';
 import RemoteAccessButton from './RemoteAccessButton';
@@ -17,7 +18,7 @@ interface TabBarProps {
   onRenameHandled: () => void;
   onNewClaudeTab: () => void;
   onNewWorktreeTab: () => void;
-  onNewShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string) => void;
+  onNewShellTab: (shellType: string, afterTabId?: string) => void;
   onReorderTabs: (tabs: TabType[]) => void;
   onRefreshTab: (tabId: string) => void;
   onManageWorktrees: () => void;
@@ -26,6 +27,9 @@ interface TabBarProps {
   onActivateRemote: () => void;
   onDeactivateRemote: () => void;
 }
+
+// Shortcut labels for the first two shell options
+const shellShortcuts = ['Ctrl+P', 'Ctrl+L'];
 
 export default function TabBar({
   tabs,
@@ -46,6 +50,7 @@ export default function TabBar({
   onActivateRemote,
   onDeactivateRemote,
 }: TabBarProps) {
+  const shellOptions = useShellOptions();
   const dragTabId = useRef<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -131,15 +136,15 @@ export default function TabBar({
             <span>Claude Worktree</span>
             <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+W</span>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => onNewShellTab('powershell', activeTabId ?? undefined)}>
-            <span>PowerShell</span>
-            <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+P</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onNewShellTab('wsl', activeTabId ?? undefined)}>
-            <span>WSL</span>
-            <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+L</span>
-          </DropdownMenuItem>
+          {shellOptions.length > 0 && <DropdownMenuSeparator />}
+          {shellOptions.map((shell, i) => (
+            <DropdownMenuItem key={shell.id} onClick={() => onNewShellTab(shell.id, activeTabId ?? undefined)}>
+              <span>{shell.label}</span>
+              {i < shellShortcuts.length && (
+                <span className="ml-auto text-[11px] text-muted-foreground">{shellShortcuts[i]}</span>
+              )}
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
       <div className="flex items-center ml-auto [-webkit-app-region:no-drag]">
