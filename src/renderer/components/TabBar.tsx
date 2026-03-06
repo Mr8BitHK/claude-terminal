@@ -29,7 +29,7 @@ interface TabBarProps {
 }
 
 // Shortcut labels for the first two shell options
-const shellShortcuts = ['Ctrl+P', 'Ctrl+L'];
+const shellShortcuts = ['Ctrl+Shift+P', 'Ctrl+L'];
 
 export default function TabBar({
   tabs,

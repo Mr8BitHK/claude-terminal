@@ -531,7 +531,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
       if (parentTab) cwd = parentTab.cwd;
     }
 
-    const tab = tabManager.createTab(cwd, null, 'shell', undefined, projectId, shellType);
+    const tab = tabManager.createTab(cwd, null, 'shell', undefined, projectId, null, shellType);
 
     if (afterTabId) {
       tabManager.removeTab(tab.id);

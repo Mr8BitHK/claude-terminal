@@ -62,7 +62,7 @@ describe('TabManager', () => {
     const shellType = isWindows ? 'powershell' : isDarwin ? 'zsh' : 'bash';
     const expectedName = isWindows ? 'PowerShell' : isDarwin ? 'Zsh' : 'Bash';
 
-    const tab = manager.createTab('D:\\dev\\MyApp', null, 'shell', undefined, '', shellType);
+    const tab = manager.createTab('D:\\dev\\MyApp', null, 'shell', undefined, '', null, shellType);
     expect(tab.type).toBe('shell');
     expect(tab.shellType).toBe(shellType);
     expect(tab.status).toBe('shell');
@@ -75,7 +75,7 @@ describe('TabManager', () => {
     const shellType = isWindows ? 'powershell' : isDarwin ? 'zsh' : 'bash';
     const expectedName = isWindows ? 'PowerShell' : isDarwin ? 'Zsh' : 'Bash';
 
-    const shell = manager.createTab('D:\\dev\\A', null, 'shell', undefined, '', shellType);
+    const shell = manager.createTab('D:\\dev\\A', null, 'shell', undefined, '', null, shellType);
     expect(shell.name).toBe(expectedName);
     const claude = manager.createTab('D:\\dev\\B', null);
     expect(claude.name).toBe('New Tab');
@@ -84,7 +84,7 @@ describe('TabManager', () => {
   it('inserts tab after the specified tab', () => {
     const tab1 = manager.createTab('D:\\dev\\A', null);
     const tab2 = manager.createTab('D:\\dev\\B', null);
-    const tab3 = manager.createTab('D:\\dev\\C', null, 'shell', undefined, '', 'bash');
+    const tab3 = manager.createTab('D:\\dev\\C', null, 'shell', undefined, '', null, 'bash');
     manager.removeTab(tab3.id);
     manager.insertTabAfter(tab1.id, tab3);
     const ids = manager.getAllTabs().map(t => t.id);
@@ -93,7 +93,7 @@ describe('TabManager', () => {
 
   it('insertTabAfter appends when afterTabId not found', () => {
     const tab1 = manager.createTab('D:\\dev\\A', null);
-    const tab2 = manager.createTab('D:\\dev\\B', null, 'shell', undefined, '', 'bash');
+    const tab2 = manager.createTab('D:\\dev\\B', null, 'shell', undefined, '', null, 'bash');
     manager.removeTab(tab2.id);
     manager.insertTabAfter('nonexistent', tab2);
     const ids = manager.getAllTabs().map(t => t.id);
