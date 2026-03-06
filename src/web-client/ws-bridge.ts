@@ -232,6 +232,10 @@ export class WebSocketBridge {
    */
   get api() {
     return {
+      // Platform info (stubs — remote client uses its own platform)
+      platform: 'linux' as NodeJS.Platform,
+      getAvailableShells: async () => [],
+
       // Workspace / Project management (stubs — not available remotely)
       initWorkspace: async (): Promise<string> => '',
       addProject: async (): Promise<ProjectConfig> => ({ id: '', dir: '', colorIndex: 0 }),
