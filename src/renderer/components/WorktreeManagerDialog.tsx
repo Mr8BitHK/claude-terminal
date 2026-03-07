@@ -42,7 +42,7 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
   useEffect(() => { loadWorktrees(); }, []);
 
   const handleDelete = async (wt: WorktreeDetail) => {
-    if (!wt.clean && confirmingDelete !== wt.path) {
+    if (confirmingDelete !== wt.path) {
       setConfirmingDelete(wt.path);
       return;
     }
@@ -101,7 +101,7 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
                     <TableCell>
                       {confirmingDelete === wt.path ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Uncommitted changes. Delete?</span>
+                          <span className="text-xs text-muted-foreground">{wt.clean ? 'Delete worktree?' : 'Uncommitted changes. Delete?'}</span>
                           <Button variant="destructive" size="sm" onClick={() => handleDelete(wt)}>Delete</Button>
                           <Button variant="outline" size="sm" onClick={() => setConfirmingDelete(null)}>Cancel</Button>
                         </div>

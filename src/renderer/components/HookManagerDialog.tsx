@@ -35,6 +35,7 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [confirmingDeleteHook, setConfirmingDeleteHook] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -162,7 +163,7 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
                     'flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-muted text-left',
                     hook.id === selectedId && 'bg-secondary'
                   )}
-                  onClick={() => setSelectedId(hook.id)}
+                  onClick={() => { setSelectedId(hook.id); setConfirmingDeleteHook(false); }}
                 >
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="truncate">{hook.name}</span>
@@ -266,13 +267,25 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
                     </Button>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  className="text-destructive border-destructive hover:bg-destructive/10 w-fit mt-2"
-                  onClick={() => deleteHook(selected.id)}
-                >
-                  <Trash2 size={14} /> Delete Hook
-                </Button>
+                {confirmingDeleteHook ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-muted-foreground">Delete this hook?</span>
+                    <Button variant="destructive" size="sm" onClick={() => { deleteHook(selected.id); setConfirmingDeleteHook(false); }}>
+                      Delete
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setConfirmingDeleteHook(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="text-destructive border-destructive hover:bg-destructive/10 w-fit mt-2"
+                    onClick={() => setConfirmingDeleteHook(true)}
+                  >
+                    <Trash2 size={14} /> Delete Hook
+                  </Button>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-2">
