@@ -1,6 +1,7 @@
 import { exec } from 'node:child_process';
 import * as pty from 'node-pty';
 import { getClaudeCommand } from '@shared/claude-cli';
+import { getShellOption } from '@shared/platform';
 
 interface ManagedPty {
   process: pty.IPty;
@@ -41,15 +42,16 @@ export class PtyManager {
   spawnShell(
     tabId: string,
     cwd: string,
-    shellType: 'powershell' | 'wsl',
+    shellId: string,
   ): pty.IPty {
     const env = Object.fromEntries(
       Object.entries(process.env).filter(([, v]) => v !== undefined),
     ) as Record<string, string>;
 
-    const shell = shellType === 'powershell' ? 'powershell.exe' : 'wsl.exe';
+    const option = getShellOption(process.platform, shellId);
+    if (!option) throw new Error(`Unknown shell type: ${shellId}`);
 
-    const proc = pty.spawn(shell, [], {
+    const proc = pty.spawn(option.command, option.args, {
       name: 'xterm-256color',
       cols: 120,
       rows: 40,

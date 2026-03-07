@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Trash2, MessageSquare, SquareTerminal, Monitor } from 'lucide-react';
+import { Trash2, MessageSquare, SquareTerminal } from 'lucide-react';
 import type { Tab } from '../../shared/types';
+import { useShellOptions } from '../shell-context';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,10 +18,11 @@ interface WorktreeManagerDialogProps {
   tabs: Tab[];
   onClose: () => void;
   onOpenClaude: (worktreeName: string) => void;
-  onOpenShell: (shellType: 'powershell' | 'wsl', cwd: string) => void;
+  onOpenShell: (shellType: string, cwd: string) => void;
 }
 
 export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onOpenShell }: WorktreeManagerDialogProps) {
+  const shellOptions = useShellOptions();
   const [worktrees, setWorktrees] = useState<WorktreeDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
   useEffect(() => { loadWorktrees(); }, []);
 
   const handleDelete = async (wt: WorktreeDetail) => {
-    if (!wt.clean && confirmingDelete !== wt.path) {
+    if (confirmingDelete !== wt.path) {
       setConfirmingDelete(wt.path);
       return;
     }
@@ -99,7 +101,7 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
                     <TableCell>
                       {confirmingDelete === wt.path ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Uncommitted changes. Delete?</span>
+                          <span className="text-xs text-muted-foreground">{wt.clean ? 'Delete worktree?' : 'Uncommitted changes. Delete?'}</span>
                           <Button variant="destructive" size="sm" onClick={() => handleDelete(wt)}>Delete</Button>
                           <Button variant="outline" size="sm" onClick={() => setConfirmingDelete(null)}>Cancel</Button>
                         </div>
@@ -114,24 +116,18 @@ export default function WorktreeManagerDialog({ tabs, onClose, onOpenClaude, onO
                           >
                             <MessageSquare size={14} />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 hover:text-[#569cd6]"
-                            onClick={() => { onOpenShell('powershell', wt.path); onClose(); }}
-                            title="Open PowerShell"
-                          >
-                            <SquareTerminal size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 hover:text-[#e2934b]"
-                            onClick={() => { onOpenShell('wsl', wt.path); onClose(); }}
-                            title="Open WSL"
-                          >
-                            <Monitor size={14} />
-                          </Button>
+                          {shellOptions.map((shell) => (
+                            <Button
+                              key={shell.id}
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 hover:text-[#569cd6]"
+                              onClick={() => { onOpenShell(shell.id, wt.path); onClose(); }}
+                              title={`Open ${shell.label}`}
+                            >
+                              <SquareTerminal size={14} />
+                            </Button>
+                          ))}
                           <Button
                             variant="ghost"
                             size="icon"

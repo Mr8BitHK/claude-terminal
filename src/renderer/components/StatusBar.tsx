@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import type { Tab, TabStatus } from '../../shared/types';
+import { useShellOptions } from '../shell-context';
 import TabIndicator from './TabIndicator';
 
 const STATUS_ORDER: { status: TabStatus; label: string }[] = [
@@ -28,6 +29,12 @@ interface StatusBarProps {
 }
 
 const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarProps) {
+  const shellOptions = useShellOptions();
+  const shellHint = shellOptions.length >= 2
+    ? `Ctrl+Shift+P ${shellOptions[0].label} | Ctrl+L ${shellOptions[1].label}`
+    : shellOptions.length === 1
+    ? `Ctrl+Shift+P ${shellOptions[0].label}`
+    : '';
   const counts = new Map<TabStatus, number>();
   for (const tab of tabs) {
     counts.set(tab.status, (counts.get(tab.status) ?? 0) + 1);
@@ -53,7 +60,7 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarP
         </span>
       )}
       <span className="ml-auto">
-        Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P Projects | Ctrl+L WSL | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
+        Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P Projects{shellHint ? ` | ${shellHint}` : ''} | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
       </span>
     </div>
   );

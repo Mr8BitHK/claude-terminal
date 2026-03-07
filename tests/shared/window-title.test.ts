@@ -9,6 +9,7 @@ const makeTab = (status: Tab['status']): Tab => ({
   status,
   worktree: null,
   cwd: '/test',
+  shellType: null,
   pid: null,
   sessionId: null,
   projectId: '',
