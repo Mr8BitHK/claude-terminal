@@ -183,6 +183,7 @@ describe('registerIpcHandlers', () => {
     const expectedHandlers = [
       'workspace:init', 'workspace:list', 'workspace:save', 'workspace:delete',
       'project:add', 'project:remove', 'project:list',
+      'shell:getAvailable',
       'session:start', 'session:getSavedTabs',
       'tab:create', 'tab:createWithWorktree', 'tab:createShell', 'tab:close', 'tab:switch', 'tab:rename', 'tab:getAll', 'tab:getActiveId',
       'worktree:create', 'worktree:currentBranch', 'worktree:listDetails', 'worktree:remove', 'worktree:checkStatus',
