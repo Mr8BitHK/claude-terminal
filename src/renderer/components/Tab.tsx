@@ -85,6 +85,7 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
         !isActive && 'hover:bg-[hsl(var(--project-hue)_20%_24%)]',
         isDragOver && 'border-l-2 border-l-primary'
       )}
+      onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(tab.id); } }}
       onClick={() => onSelect(tab.id)}
       onDoubleClick={handleDoubleClick}
       draggable={!isRenaming}
