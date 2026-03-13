@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PermissionMode } from '../../shared/types';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -62,6 +62,7 @@ export default function StartupDialog({ onStart, onCancel, title = 'Claude Termi
       <DialogContent className="max-w-[480px]" onKeyDown={handleKeyDown}>
         <DialogHeader className="text-center">
           <DialogTitle className="text-xl">{title}</DialogTitle>
+          <DialogDescription className="sr-only">Select a directory and permission mode to start a session</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
