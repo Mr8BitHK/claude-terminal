@@ -33,6 +33,9 @@ export default function App() {
   const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
 
+  // Remember last active tab per project for Up/Down navigation
+  const lastActiveTabByProject = useRef<Map<string, string>>(new Map());
+
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const activeTabIdRef = useRef(activeTabId);
@@ -90,16 +93,33 @@ export default function App() {
 
   const handleSelectTab = useCallback(async (tabId: string) => {
     setActiveTabId(tabId);
+    // Remember this tab as the last active for its project
+    const tab = tabsRef.current.find(t => t.id === tabId);
+    if (tab) {
+      lastActiveTabByProject.current.set(tab.projectId, tabId);
+    }
     await window.claudeTerminal.switchTab(tabId);
   }, []);
 
   const handleSelectProject = useCallback(async (projectId: string) => {
+    // Save current tab for the project we're leaving
+    const leavingProjectId = activeProjectIdRef.current;
+    const leavingTabId = activeTabIdRef.current;
+    if (leavingProjectId && leavingTabId) {
+      lastActiveTabByProject.current.set(leavingProjectId, leavingTabId);
+    }
+
     setActiveProjectId(projectId);
     setShowProjectSwitcher(false);
-    // Auto-select first tab of the new project, or create one if none exist
+
     const projectTabs = tabsRef.current.filter(t => t.projectId === projectId);
     if (projectTabs.length > 0) {
-      handleSelectTab(projectTabs[0].id);
+      // Restore last active tab for this project, or fall back to first tab
+      const rememberedTabId = lastActiveTabByProject.current.get(projectId);
+      const targetTab = rememberedTabId && projectTabs.some(t => t.id === rememberedTabId)
+        ? rememberedTabId
+        : projectTabs[0].id;
+      handleSelectTab(targetTab);
     } else {
       const tab = await window.claudeTerminal.createTab(projectId, null);
       setActiveTabId(tab.id);
