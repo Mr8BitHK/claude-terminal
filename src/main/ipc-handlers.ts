@@ -57,7 +57,7 @@ export interface IpcHandlerDeps {
 /** Resolve hooksDir based on dev/production mode */
 function resolveHooksDir(): string {
   return app.isPackaged
-    ? path.join(path.dirname(process.execPath), '..', 'hooks')
+    ? path.join(process.resourcesPath, 'hooks')
     : path.join(__dirname, '..', '..', 'src', 'hooks');
 }
 
