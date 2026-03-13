@@ -4,7 +4,7 @@ import { PROJECT_COLORS } from '../shared/types';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
-import { destroyTerminal, terminalCache } from './components/terminalCache';
+import { destroyTerminal } from './components/terminalCache';
 import StatusBar from './components/StatusBar';
 import ProjectSidebar from './components/ProjectSidebar';
 import ProjectSwitcherDialog from './components/ProjectSwitcherDialog';
@@ -176,11 +176,7 @@ export default function App() {
   }, []);
 
   const handleRefreshTab = useCallback((tabId: string) => {
-    const cached = terminalCache.get(tabId);
-    if (cached) {
-      cached.term.clear();
-    }
-    // Send Ctrl+L to the PTY so the running app redraws
+    // Send Ctrl+L to the PTY so the running app redraws the current screen
     window.claudeTerminal.writeToPty(tabId, '\x0c');
   }, []);
 
