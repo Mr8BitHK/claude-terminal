@@ -154,14 +154,6 @@ function persistSessions() {
   }, 200);
 }
 
-async function flushPersistSessions(): Promise<void> {
-  if (persistDebounceTimer) {
-    clearTimeout(persistDebounceTimer);
-    persistDebounceTimer = null;
-  }
-  await doPersistSessions();
-}
-
 // ---------------------------------------------------------------------------
 // Remote access
 // ---------------------------------------------------------------------------
@@ -374,8 +366,16 @@ app.on('ready', async () => {
 
 app.on('window-all-closed', async () => {
   log.info('[quit] workspaceDir:', state.workspaceDir, 'tabs:', tabManager.getAllTabs().length);
-  await flushPersistSessions();
+  // Stop persisting immediately — the on-disk sessions file is already
+  // up-to-date because every tab mutation (create, close, rename, reorder,
+  // sessionId) calls persistSessions() at the point of change.  Writing
+  // again here is redundant and risks overwriting good state with degraded
+  // shutdown state (e.g. after PTYs are killed).
   shuttingDown = true;
+  if (persistDebounceTimer) {
+    clearTimeout(persistDebounceTimer);
+    persistDebounceTimer = null;
+  }
 
   for (const tab of tabManager.getAllTabs()) {
     cleanupNamingFlag(tab.id);
