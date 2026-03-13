@@ -4,7 +4,7 @@ import { PROJECT_COLORS } from '../shared/types';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
-import { destroyTerminal } from './components/terminalCache';
+import { destroyTerminal, terminalCache } from './components/terminalCache';
 import StatusBar from './components/StatusBar';
 import ProjectSidebar from './components/ProjectSidebar';
 import ProjectSwitcherDialog from './components/ProjectSwitcherDialog';
@@ -173,6 +173,15 @@ export default function App() {
   const handleReorderTabs = useCallback((reordered: Tab[]) => {
     setTabs(reordered);
     window.claudeTerminal.reorderTabs(reordered.map((t) => t.id));
+  }, []);
+
+  const handleRefreshTab = useCallback((tabId: string) => {
+    const cached = terminalCache.get(tabId);
+    if (cached) {
+      cached.term.clear();
+    }
+    // Send Ctrl+L to the PTY so the running app redraws
+    window.claudeTerminal.writeToPty(tabId, '\x0c');
   }, []);
 
   const handleActivateRemote = useCallback(async () => {
@@ -525,6 +534,7 @@ export default function App() {
           onNewWorktreeTab={tryShowWorktreeDialog}
           onNewShellTab={handleNewShellTab}
           onReorderTabs={handleReorderTabs}
+          onRefreshTab={handleRefreshTab}
           onManageWorktrees={() => setShowWorktreeManager(true)}
           onManageHooks={() => setShowHookManager(true)}
           remoteInfo={remoteInfo}

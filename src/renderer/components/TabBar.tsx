@@ -19,6 +19,7 @@ interface TabBarProps {
   onNewWorktreeTab: () => void;
   onNewShellTab: (shellType: 'powershell' | 'wsl', afterTabId?: string) => void;
   onReorderTabs: (tabs: TabType[]) => void;
+  onRefreshTab: (tabId: string) => void;
   onManageWorktrees: () => void;
   onManageHooks: () => void;
   remoteInfo: RemoteAccessInfo;
@@ -38,6 +39,7 @@ export default function TabBar({
   onNewWorktreeTab,
   onNewShellTab,
   onReorderTabs,
+  onRefreshTab,
   onManageWorktrees,
   onManageHooks,
   remoteInfo,
@@ -105,6 +107,7 @@ export default function TabBar({
             onRename={onRenameTab}
             onRenameHandled={onRenameHandled}
             onOpenShell={tab.type === 'claude' ? onNewShellTab : undefined}
+            onRefresh={onRefreshTab}
             isDragOver={dragOverTabId === tab.id}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}

@@ -17,6 +17,7 @@ interface TabProps {
   onRename: (tabId: string, name: string) => void;
   onRenameHandled: () => void;
   onOpenShell?: (shellType: 'powershell' | 'wsl', afterTabId: string) => void;
+  onRefresh: (tabId: string) => void;
   onDragStart: (e: React.DragEvent, tabId: string) => void;
   onDragOver: (e: React.DragEvent, tabId: string) => void;
   onDragEnd: () => void;
@@ -24,7 +25,7 @@ interface TabProps {
   isDragOver: boolean;
 }
 
-const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenamingProp, onSelect, onClose, onRename, onRenameHandled, onOpenShell, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver }: TabProps) {
+const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenamingProp, onSelect, onClose, onRename, onRenameHandled, onOpenShell, onRefresh, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver }: TabProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(tab.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -126,23 +127,26 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
           </span>
         )}
       </div>
-      {tab.type === 'claude' && onOpenShell && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="text-muted-foreground hover:text-foreground text-xs px-0.5"
-              onClick={(e) => e.stopPropagation()}
-              title="Open shell here"
-            >
-              &#9662;
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => handleOpenShell('powershell')}>PowerShell here</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleOpenShell('wsl')}>WSL here</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="text-muted-foreground hover:text-foreground text-xs px-0.5"
+            onClick={(e) => e.stopPropagation()}
+            title="Tab options"
+          >
+            &#9662;
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={() => onRefresh(tab.id)}>Refresh terminal</DropdownMenuItem>
+          {tab.type === 'claude' && onOpenShell && (
+            <>
+              <DropdownMenuItem onClick={() => handleOpenShell('powershell')}>PowerShell here</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleOpenShell('wsl')}>WSL here</DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <button
         className="text-muted-foreground hover:text-foreground text-base px-0.5"
         onClick={handleCloseClick}
