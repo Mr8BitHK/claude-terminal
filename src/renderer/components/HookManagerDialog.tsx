@@ -147,13 +147,13 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
   return (
     <>
     <Dialog open onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="w-[700px] max-w-[90vw] max-h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-[900px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Hooks</DialogTitle>
         </DialogHeader>
         <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Left panel: hook list */}
-          <div className="flex flex-col gap-2 w-[200px] shrink-0">
+          <div className="flex flex-col gap-2 w-[220px] shrink-0">
             <div className="flex flex-col gap-0.5 overflow-y-auto flex-1">
               {config.hooks.map(hook => (
                 <button
@@ -216,49 +216,59 @@ export default function HookManagerDialog({ onClose }: HookManagerDialogProps) {
                   <Label>Commands</Label>
                   <div className="flex flex-col gap-1.5">
                     {selected.commands.map((cmd, idx) => (
-                      <div key={idx} className="flex items-center gap-1">
-                        <Input
-                          className="w-[80px] shrink-0"
-                          placeholder="path"
-                          value={cmd.path}
-                          onChange={e => updateCommand(selected.id, idx, { path: e.target.value })}
-                        />
-                        <Input
-                          className="flex-1"
-                          placeholder="command"
-                          value={cmd.command}
-                          onChange={e => updateCommand(selected.id, idx, { command: e.target.value })}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={() => moveCommand(selected.id, idx, -1)}
-                          disabled={idx === 0}
-                          title="Move up"
-                        >
-                          <ChevronUp size={12} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={() => moveCommand(selected.id, idx, 1)}
-                          disabled={idx === selected.commands.length - 1}
-                          title="Move down"
-                        >
-                          <ChevronDown size={12} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0 hover:text-destructive"
-                          onClick={() => removeCommand(selected.id, idx)}
-                          disabled={selected.commands.length <= 1}
-                          title="Remove"
-                        >
-                          <Trash2 size={12} />
-                        </Button>
+                      <div key={idx} className="flex items-start gap-2 rounded border border-border/50 p-2">
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground w-12 shrink-0">Path</Label>
+                            <Input
+                              className="flex-1"
+                              placeholder="working directory"
+                              value={cmd.path}
+                              onChange={e => updateCommand(selected.id, idx, { path: e.target.value })}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground w-12 shrink-0">Cmd</Label>
+                            <Input
+                              className="flex-1"
+                              placeholder="command to run"
+                              value={cmd.command}
+                              onChange={e => updateCommand(selected.id, idx, { command: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-center shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => moveCommand(selected.id, idx, -1)}
+                            disabled={idx === 0}
+                            title="Move up"
+                          >
+                            <ChevronUp size={12} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => moveCommand(selected.id, idx, 1)}
+                            disabled={idx === selected.commands.length - 1}
+                            title="Move down"
+                          >
+                            <ChevronDown size={12} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 hover:text-destructive"
+                            onClick={() => removeCommand(selected.id, idx)}
+                            disabled={selected.commands.length <= 1}
+                            title="Remove"
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     <Button variant="outline" size="sm" onClick={() => addCommand(selected.id)} className="w-fit">
