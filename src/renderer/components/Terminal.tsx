@@ -131,6 +131,16 @@ const Terminal = React.memo(function Terminal({ tabId, isVisible, fixedCols, fix
           if (kb.onTerminal && e.type === 'keydown') kb.onTerminal(tabId);
           return false;
         }
+        // Ctrl+V / Ctrl+Shift+V: paste from clipboard into terminal.
+        // Without this, xterm sends \x16 (literal-next) to the PTY, which
+        // breaks clipboard-based text insertion tools like Wisprflow.
+        if (e.ctrlKey && e.key === 'v' && e.type === 'keydown') {
+          e.preventDefault();
+          navigator.clipboard.readText().then((text) => {
+            if (text) term.paste(text);
+          });
+          return false;
+        }
         return true;
       });
 
