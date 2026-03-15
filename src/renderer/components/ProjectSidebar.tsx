@@ -25,10 +25,12 @@ export default function ProjectSidebar({
 }: Props) {
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const closeContextMenu = useCallback(() => {
     setContextMenuId(null);
     setContextMenuPos(null);
+    setConfirmingRemove(false);
   }, []);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, projectId: string) => {
@@ -102,15 +104,24 @@ export default function ProjectSidebar({
             Rename
           </button>
           {projects.length > 1 && (
-            <button
-              className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent bg-transparent border-none cursor-pointer font-inherit"
-              onClick={() => {
-                onRemoveProject(contextMenuId);
-                closeContextMenu();
-              }}
-            >
-              Remove
-            </button>
+            confirmingRemove ? (
+              <button
+                className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent bg-transparent border-none cursor-pointer font-inherit font-semibold"
+                onClick={() => {
+                  onRemoveProject(contextMenuId);
+                  closeContextMenu();
+                }}
+              >
+                Confirm Remove
+              </button>
+            ) : (
+              <button
+                className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent bg-transparent border-none cursor-pointer font-inherit"
+                onClick={(e) => { e.stopPropagation(); setConfirmingRemove(true); }}
+              >
+                Remove
+              </button>
+            )
           )}
         </div>
       )}
