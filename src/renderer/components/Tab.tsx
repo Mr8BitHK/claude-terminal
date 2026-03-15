@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, SquareTerminal } from 'lucide-react';
 import { penguin } from '@lucide/lab';
 import type { Tab as TabType } from '../../shared/types';
+import { useShellOptions } from '../shell-context';
 import TabIndicator from './TabIndicator';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,7 @@ interface TabProps {
   onClose: (tabId: string) => void;
   onRename: (tabId: string, name: string) => void;
   onRenameHandled: () => void;
-  onOpenShell?: (shellType: 'powershell' | 'wsl', afterTabId: string) => void;
+  onOpenShell?: (shellType: string, afterTabId: string) => void;
   onRefresh: (tabId: string) => void;
   onDragStart: (e: React.DragEvent, tabId: string) => void;
   onDragOver: (e: React.DragEvent, tabId: string) => void;
@@ -26,6 +27,7 @@ interface TabProps {
 }
 
 const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenamingProp, onSelect, onClose, onRename, onRenameHandled, onOpenShell, onRefresh, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver }: TabProps) {
+  const shellOptions = useShellOptions();
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(tab.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,9 +75,11 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
     onClose(tab.id);
   };
 
-  const handleOpenShell = useCallback((shellType: 'powershell' | 'wsl') => {
+  const handleOpenShell = useCallback((shellType: string) => {
     onOpenShell?.(shellType, tab.id);
   }, [onOpenShell, tab.id]);
+
+  const showPenguin = tab.type === 'shell' && tab.shellType === 'wsl';
 
   return (
     <div
@@ -99,10 +103,10 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
         <TabIndicator status={tab.status} />
       ) : (
         <span className="inline-flex items-center [&_svg]:size-3 text-[#569cd6]">
-          {tab.type === 'powershell' ? (
-            <SquareTerminal size={12} />
-          ) : (
+          {showPenguin ? (
             <Icon iconNode={penguin} size={12} />
+          ) : (
+            <SquareTerminal size={12} />
           )}
         </span>
       )}
@@ -140,12 +144,11 @@ const Tab = React.memo(function Tab({ tab, index, isActive, isRenaming: isRenami
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem onClick={() => onRefresh(tab.id)}>Refresh terminal</DropdownMenuItem>
-          {tab.type === 'claude' && onOpenShell && (
-            <>
-              <DropdownMenuItem onClick={() => handleOpenShell('powershell')}>PowerShell here</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleOpenShell('wsl')}>WSL here</DropdownMenuItem>
-            </>
-          )}
+          {tab.type === 'claude' && onOpenShell && shellOptions.map((shell) => (
+            <DropdownMenuItem key={shell.id} onClick={() => handleOpenShell(shell.id)}>
+              {shell.label} here
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
       <button

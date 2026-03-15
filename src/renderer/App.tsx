@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PermissionMode, Tab, RemoteAccessInfo, HookExecutionStatus, ProjectConfig } from '../shared/types';
 import { PROJECT_COLORS } from '../shared/types';
+import type { ShellOption } from '../shared/platform';
+import { getAllShellOptions } from '../shared/platform';
+import { ShellContext } from './shell-context';
 import StartupDialog from './components/StartupDialog';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
@@ -52,11 +55,19 @@ export default function App() {
   const [branch, setBranch] = useState<string | null>(null);
   const [showHookManager, setShowHookManager] = useState(false);
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
+  const [availableShells, setAvailableShells] = useState<ShellOption[]>(
+    () => getAllShellOptions(window.claudeTerminal?.platform ?? 'linux')
+  );
   const [hookStatus, setHookStatus] = useState<{ hookName: string; status: 'running' | 'done' | 'failed'; error?: string } | null>(null);
   const hookDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [worktreeCloseConfirm, setWorktreeCloseConfirm] = useState<{
     tabId: string; worktreeName: string; clean: boolean; changesCount: number;
   } | null>(null);
+
+  // Fetch available shells (filter to installed ones)
+  useEffect(() => {
+    window.claudeTerminal.getAvailableShells().then(setAvailableShells).catch(() => {});
+  }, []);
 
   // Filter tabs by active project
   const activeProjectTabs = useMemo(
@@ -152,7 +163,7 @@ export default function App() {
     setActiveTabId(tab.id);
   }, []);
 
-  const handleNewShellTab = useCallback(async (shellType: 'powershell' | 'wsl', afterTabId?: string) => {
+  const handleNewShellTab = useCallback(async (shellType: string, afterTabId?: string) => {
     const tab = await window.claudeTerminal.createShellTab(shellType, afterTabId);
     if (afterTabId) {
       setTabs((prev) => {
@@ -498,13 +509,16 @@ export default function App() {
 
   if (appState === 'startup') {
     return (
-      <div className="flex flex-col h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
-        <StartupDialog onStart={handleStartSession} />
-      </div>
+      <ShellContext.Provider value={availableShells}>
+        <div className="flex flex-col h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
+          <StartupDialog onStart={handleStartSession} />
+        </div>
+      </ShellContext.Provider>
     );
   }
 
   return (
+    <ShellContext.Provider value={availableShells}>
     <div className="flex flex-row h-screen border border-[hsl(var(--project-hue)_40%_25%)]">
       {projects.length > 0 && (
         <ProjectSidebar
@@ -617,5 +631,6 @@ export default function App() {
         </DialogContent>
       </Dialog>
     </div>
+    </ShellContext.Provider>
   );
 }

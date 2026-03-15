@@ -56,23 +56,27 @@ describe('TabManager', () => {
     expect(manager.getTab(tab.id)).toBeUndefined();
   });
 
-  it('creates a powershell tab with correct defaults', () => {
-    const tab = manager.createTab('D:\\dev\\MyApp', null, 'powershell');
-    expect(tab.type).toBe('powershell');
-    expect(tab.status).toBe('shell');
-    expect(tab.name).toBe('PowerShell');
-  });
+  it('creates a shell tab with correct defaults', () => {
+    const isWindows = process.platform === 'win32';
+    const isDarwin = process.platform === 'darwin';
+    const shellType = isWindows ? 'powershell' : isDarwin ? 'zsh' : 'bash';
+    const expectedName = isWindows ? 'PowerShell' : isDarwin ? 'Zsh' : 'Bash';
 
-  it('creates a wsl tab with correct defaults', () => {
-    const tab = manager.createTab('D:\\dev\\MyApp', null, 'wsl');
-    expect(tab.type).toBe('wsl');
+    const tab = manager.createTab('D:\\dev\\MyApp', null, 'shell', undefined, '', null, shellType);
+    expect(tab.type).toBe('shell');
+    expect(tab.shellType).toBe(shellType);
     expect(tab.status).toBe('shell');
-    expect(tab.name).toBe('WSL');
+    expect(tab.name).toBe(expectedName);
   });
 
   it('shell tabs use shell-specific names', () => {
-    const shell = manager.createTab('D:\\dev\\A', null, 'powershell');
-    expect(shell.name).toBe('PowerShell');
+    const isWindows = process.platform === 'win32';
+    const isDarwin = process.platform === 'darwin';
+    const shellType = isWindows ? 'powershell' : isDarwin ? 'zsh' : 'bash';
+    const expectedName = isWindows ? 'PowerShell' : isDarwin ? 'Zsh' : 'Bash';
+
+    const shell = manager.createTab('D:\\dev\\A', null, 'shell', undefined, '', null, shellType);
+    expect(shell.name).toBe(expectedName);
     const claude = manager.createTab('D:\\dev\\B', null);
     expect(claude.name).toBe('New Tab');
   });
@@ -80,7 +84,7 @@ describe('TabManager', () => {
   it('inserts tab after the specified tab', () => {
     const tab1 = manager.createTab('D:\\dev\\A', null);
     const tab2 = manager.createTab('D:\\dev\\B', null);
-    const tab3 = manager.createTab('D:\\dev\\C', null, 'powershell');
+    const tab3 = manager.createTab('D:\\dev\\C', null, 'shell', undefined, '', null, 'bash');
     manager.removeTab(tab3.id);
     manager.insertTabAfter(tab1.id, tab3);
     const ids = manager.getAllTabs().map(t => t.id);
@@ -89,7 +93,7 @@ describe('TabManager', () => {
 
   it('insertTabAfter appends when afterTabId not found', () => {
     const tab1 = manager.createTab('D:\\dev\\A', null);
-    const tab2 = manager.createTab('D:\\dev\\B', null, 'wsl');
+    const tab2 = manager.createTab('D:\\dev\\B', null, 'shell', undefined, '', null, 'bash');
     manager.removeTab(tab2.id);
     manager.insertTabAfter('nonexistent', tab2);
     const ids = manager.getAllTabs().map(t => t.id);

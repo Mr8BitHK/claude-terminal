@@ -1,9 +1,10 @@
 import { app, dialog, ipcMain, shell } from 'electron';
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { PermissionMode, RemoteAccessInfo, RepoHookConfig, Tab, ProjectConfig } from '@shared/types';
+import { getAllShellOptions, type ShellOption } from '@shared/platform';
 import { PERMISSION_FLAGS } from '@shared/types';
 import { WorktreeManager } from './worktree-manager';
 import { HookInstaller } from './hook-installer';
@@ -154,6 +155,22 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     entry.watcher.on('error', () => { /* ignore watch errors */ });
     gitHeadWatchers.set(projectId, entry);
   }
+
+  // ---- Platform / Shell discovery ----
+  ipcMain.handle('shell:getAvailable', async (): Promise<ShellOption[]> => {
+    const all = getAllShellOptions(process.platform);
+    if (process.platform === 'win32') {
+      // On Windows, shells are .exe on PATH — but verify WSL is actually installed
+      return all.filter(s => {
+        if (s.id !== 'wsl') return true;
+        try { execSync('wsl.exe --status', { stdio: 'ignore', timeout: 3000 }); return true; } catch { return false; }
+      });
+    }
+    // On Unix, check that the binary exists
+    return all.filter(s => {
+      try { fs.accessSync(s.command, fs.constants.X_OK); return true; } catch { return false; }
+    });
+  });
 
   // ---- Workspace / Project ----
   ipcMain.handle('workspace:init', async (_event, mode: PermissionMode) => {
@@ -495,7 +512,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     return tab;
   });
 
-  ipcMain.handle('tab:createShell', async (_event, shellType: 'powershell' | 'wsl', afterTabId?: string, explicitCwd?: string) => {
+  ipcMain.handle('tab:createShell', async (_event, shellType: string, afterTabId?: string, explicitCwd?: string) => {
     // Derive project from afterTabId or first project
     let projectId: string | undefined;
     if (afterTabId) {
@@ -517,7 +534,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
       if (parentTab) cwd = parentTab.cwd;
     }
 
-    const tab = tabManager.createTab(cwd, null, shellType, undefined, projectId);
+    const tab = tabManager.createTab(cwd, null, 'shell', undefined, projectId, null, shellType);
 
     if (afterTabId) {
       tabManager.removeTab(tab.id);
