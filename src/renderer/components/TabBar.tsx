@@ -28,8 +28,9 @@ interface TabBarProps {
   onDeactivateRemote: () => void;
 }
 
-// Shortcut labels for the first two shell options
-const shellShortcuts = ['Ctrl+Shift+P', 'Ctrl+L'];
+// Shortcut labels — Ctrl+L (second shell) only on Windows to avoid terminal clear-screen conflict
+const isWindows = window.claudeTerminal?.platform === 'win32';
+const shellShortcuts = isWindows ? ['Ctrl+Shift+P', 'Ctrl+L'] : ['Ctrl+Shift+P'];
 
 export default function TabBar({
   tabs,

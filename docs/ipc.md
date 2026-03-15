@@ -79,6 +79,14 @@ The renderer accesses the API as `window.claudeTerminal.<method>(...)`.
 | `project:removed` | main -> renderer | webContents.send | `onProjectRemoved(cb)` | `projectId: string` |
 | `tab:projectSwitch` | main -> renderer | webContents.send | `onProjectSwitch(cb)` | `projectId: string` |
 
+### Platform / Shell Discovery
+
+| Channel | Direction | Pattern | Renderer Signature | Payload |
+|---|---|---|---|---|
+| `shell:getAvailable` | renderer -> main | invoke | `getAvailableShells()` | -> `ShellOption[]` |
+
+The `shell:getAvailable` handler returns the list of shells installed on the current platform. On Windows, it verifies WSL availability via an async `exec('wsl.exe --status')`. On Unix, it checks each shell binary with `fs.accessSync`. This channel is local-only; the web client's `ws-bridge.ts` returns an empty array (remote clients cannot spawn local shells).
+
 ### Session & Startup (Legacy)
 
 The `session:start` channel is retained for backward compatibility. It wraps `workspace:init` + `project:add` into a single call and now returns `{ projectId: string }` instead of `void`.
@@ -94,7 +102,7 @@ The `session:start` channel is retained for backward compatibility. It wraps `wo
 | Channel | Direction | Pattern | Renderer Signature | Payload |
 |---|---|---|---|---|
 | `tab:create` | renderer -> main | invoke | `createTab(projectId, worktree?, resumeSessionId?, savedName?)` | `projectId: string` -> `Tab` |
-| `tab:createShell` | renderer -> main | invoke | `createShellTab(shellType, afterTabId?, cwd?)` | -> `Tab` |
+| `tab:createShell` | renderer -> main | invoke | `createShellTab(shellType, afterTabId?, cwd?)` | `shellType: string` -> `Tab` |
 | `tab:close` | renderer -> main | invoke | `closeTab(tabId, removeWorktree?)` | `tabId: string`, `removeWorktree?: boolean` |
 | `tab:switch` | renderer -> main | invoke | `switchTab(tabId)` | `tabId: string` |
 | `tab:rename` | renderer -> main | invoke | `renameTab(tabId, name)` | `tabId: string`, `name: string` |

@@ -1,13 +1,13 @@
 # Tab Management
 
-ClaudeTerminal's tab system manages multiple concurrent Claude Code sessions, PowerShell terminals, and WSL terminals within a single Electron window. Each tab wraps a pseudo-terminal (PTY) and maintains its own lifecycle, status, working directory, and optional git worktree association.
+ClaudeTerminal's tab system manages multiple concurrent Claude Code sessions and shell terminals within a single Electron window. Each tab wraps a pseudo-terminal (PTY) and maintains its own lifecycle, status, working directory, and optional git worktree association.
 
 ## Tab Types
 
-There are three tab types, defined in `src/shared/types.ts`:
+There are two tab types, defined in `src/shared/types.ts`:
 
 ```typescript
-type TabType = 'claude' | 'powershell' | 'wsl';
+type TabType = 'claude' | 'shell';
 ```
 
 ### Claude tabs
@@ -18,7 +18,15 @@ Each Claude tab can optionally be associated with a **git worktree** -- an isola
 
 ### Shell tabs
 
-PowerShell and WSL tabs spawn `powershell.exe` or `wsl.exe` directly with no arguments. They use a fixed `shell` status and do not participate in hook-based status tracking or session persistence.
+Shell tabs spawn a platform-appropriate shell process. Available shells are detected at startup via the `shell:getAvailable` IPC channel and exposed to the renderer through `ShellContext`. Shell definitions live in `src/shared/platform.ts`.
+
+| Platform | Shells | Detection |
+|----------|--------|-----------|
+| Windows | PowerShell, WSL, Command Prompt | WSL verified via async `wsl.exe --status` |
+| macOS | Zsh, Bash | `fs.accessSync` with `X_OK` flag |
+| Linux | Bash, Zsh, Fish | `fs.accessSync` with `X_OK` flag |
+
+Shell tabs use a fixed `shell` status and do not participate in hook-based status tracking or session persistence. The `Tab.shellType` field identifies which shell is running (e.g. `'powershell'`, `'bash'`, `'zsh'`).
 
 Shell tabs can be opened from the `+` menu, keyboard shortcuts, or from a Claude tab's chevron dropdown. When opened via the chevron, the shell inherits the Claude tab's working directory and is inserted immediately after it in the tab bar.
 
@@ -33,12 +41,14 @@ Claude Tab (cwd: D:\project\.claude\worktrees\feature-x)
 ```typescript
 interface Tab {
   id: string;           // Unique ID: "tab-{timestamp}-{random}"
-  type: TabType;        // 'claude' | 'powershell' | 'wsl'
+  type: TabType;        // 'claude' | 'shell'
   name: string;         // Display name (user-editable)
   defaultName: string;  // Original name (for reset on /clear)
   status: TabStatus;    // Current lifecycle state
   worktree: string | null; // Worktree name, or null for root workspace
+  sourceBranch: string | null; // Branch this worktree was created from
   cwd: string;          // Working directory path
+  shellType: string | null; // Shell identifier (e.g. 'powershell', 'bash'), null for claude tabs
   pid: number | null;   // PTY process ID
   sessionId: string | null; // Claude session ID (for --resume)
   projectId: string;    // Project this tab belongs to (see docs/multi-project.md)
@@ -49,8 +59,7 @@ The `projectId` field links every tab to a specific project in the workspace. It
 
 Default naming:
 - Claude tabs: worktree name if set, otherwise `New Tab`
-- PowerShell tabs: `PowerShell`
-- WSL tabs: `WSL`
+- Shell tabs: derived from `ShellOption.defaultName` (e.g. `PowerShell`, `Bash`, `Zsh`)
 
 ## Tab Lifecycle
 
@@ -79,10 +88,10 @@ For shell tabs, the flow is simpler:
 
 ```
 User action (Ctrl+Shift+P, Ctrl+L, chevron menu)
-  -> IPC: tab:createShell
+  -> IPC: tab:createShell(shellType, afterTabId?, cwd?)
     -> Derive projectId from afterTabId or first project
-    -> TabManager.createTab(cwd, null, shellType, undefined, projectId)
-    -> PtyManager.spawnShell() -- spawns powershell.exe or wsl.exe directly
+    -> TabManager.createTab(cwd, null, 'shell', undefined, projectId, null, shellType)
+    -> PtyManager.spawnShell() -- resolves command from platform.ts, spawns the shell
     -> Wire onData/onExit (same as Claude tabs, minus hook infrastructure)
     -> If afterTabId provided: insert tab after the specified tab
 ```

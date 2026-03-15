@@ -118,11 +118,13 @@ Opened from the hamburger menu ("Manage Worktrees"). Displays a table of all wor
 | Status | `clean` or `dirty` badge |
 | Changes | Number of uncommitted files |
 | Open | Dot indicator if a tab is open for this worktree |
-| Actions | Open Claude tab, open PowerShell, open WSL, delete |
+| Actions | Open Claude tab, open shell (platform-dependent), delete |
 
 Delete behavior:
-- **Clean worktree**: Deletes immediately.
-- **Dirty worktree**: Shows inline confirmation ("Uncommitted changes. Delete?") with Delete/Cancel buttons. A second click on Delete confirms.
+- **Clean worktree**: Shows inline confirmation ("Delete worktree?") with Delete/Cancel buttons.
+- **Dirty worktree**: Shows inline confirmation ("Uncommitted changes. Delete?") with Delete/Cancel buttons.
+
+All worktree deletions require explicit confirmation regardless of clean/dirty state.
 
 The dialog checks for open tabs by comparing `tab.worktree` against each worktree name. Note that deleting a worktree from this dialog does **not** close any open tabs for it -- the tab's PTY process will continue running in the (now-removed) directory.
 

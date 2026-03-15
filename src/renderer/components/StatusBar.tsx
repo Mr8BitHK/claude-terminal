@@ -30,9 +30,10 @@ interface StatusBarProps {
 
 const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarProps) {
   const shellOptions = useShellOptions();
-  const shellHint = shellOptions.length >= 2
+  const isWindows = window.claudeTerminal?.platform === 'win32';
+  const shellHint = shellOptions.length >= 2 && isWindows
     ? `Ctrl+Shift+P ${shellOptions[0].label} | Ctrl+L ${shellOptions[1].label}`
-    : shellOptions.length === 1
+    : shellOptions.length >= 1
     ? `Ctrl+Shift+P ${shellOptions[0].label}`
     : '';
   const counts = new Map<TabStatus, number>();

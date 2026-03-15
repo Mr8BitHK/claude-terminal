@@ -52,8 +52,11 @@ function cycleProject(ctx: KeybindingContext, direction: 1 | -1) {
   ctx.selectProject(projects[next].id);
 }
 
-// Shell keybindings are platform-dependent
-const shellOptions = getAllShellOptions(window.claudeTerminal?.platform ?? 'linux');
+// Shell keybindings are platform-dependent.
+// Ctrl+L conflicts with terminal clear-screen on all platforms, so we only
+// bind it on Windows (where the WSL shortcut was already established).
+const platform = window.claudeTerminal?.platform ?? 'linux';
+const shellOptions = getAllShellOptions(platform);
 const shellKeybindings: Keybinding[] = [];
 if (shellOptions.length >= 1) {
   shellKeybindings.push({
@@ -61,7 +64,7 @@ if (shellOptions.length >= 1) {
     action: (ctx) => ctx.newShellTab(shellOptions[0].id, ctx.activeTabId() ?? undefined),
   });
 }
-if (shellOptions.length >= 2) {
+if (shellOptions.length >= 2 && platform === 'win32') {
   shellKeybindings.push({
     mod: 'ctrl', key: 'l',
     action: (ctx) => ctx.newShellTab(shellOptions[1].id, ctx.activeTabId() ?? undefined),

@@ -37,6 +37,7 @@ export default function ProjectSidebar({
     e.preventDefault();
     setContextMenuId(projectId);
     setContextMenuPos({ x: e.clientX, y: e.clientY });
+    setConfirmingRemove(false);
   }, []);
 
   return (

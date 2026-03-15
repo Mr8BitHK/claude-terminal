@@ -1,5 +1,5 @@
 import { app, dialog, ipcMain, shell } from 'electron';
-import { execSync, spawn } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -161,10 +161,10 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     const all = getAllShellOptions(process.platform);
     if (process.platform === 'win32') {
       // On Windows, shells are .exe on PATH — but verify WSL is actually installed
-      return all.filter(s => {
-        if (s.id !== 'wsl') return true;
-        try { execSync('wsl.exe --status', { stdio: 'ignore', timeout: 3000 }); return true; } catch { return false; }
+      const wslInstalled = await new Promise<boolean>((resolve) => {
+        exec('wsl.exe --status', { timeout: 3000 }, (err) => resolve(!err));
       });
+      return all.filter(s => s.id !== 'wsl' || wslInstalled);
     }
     // On Unix, check that the binary exists
     return all.filter(s => {
