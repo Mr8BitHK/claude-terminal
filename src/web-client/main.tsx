@@ -1,16 +1,20 @@
-import { StrictMode, useCallback, useEffect, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import type { Tab, RemoteAccessInfo } from '../shared/types';
 import { WebSocketBridge } from './ws-bridge';
 import TabBar from '../renderer/components/TabBar';
 import Terminal from '../renderer/components/Terminal';
 import StatusBar from '../renderer/components/StatusBar';
+import TabIndicator from '../renderer/components/TabIndicator';
 import WorktreeNameDialog from '../renderer/components/WorktreeNameDialog';
 import { destroyTerminal } from '../renderer/components/terminalCache';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Menu } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import '../renderer/globals.css';
 import './web-client.css';
 
@@ -66,44 +70,135 @@ function TokenScreen({ onConnected }: {
   };
 
   return (
-    <div className="flex flex-col h-dvh">
+    <div className="flex items-center justify-center h-dvh">
       <Dialog open>
-        <DialogContent className="max-w-[480px]">
-          <DialogHeader className="text-center">
+        <DialogContent showCloseButton={false} className="p-8">
+          <DialogHeader className="text-center pb-2">
             <DialogTitle className="text-xl">Claude Terminal Remote</DialogTitle>
           </DialogHeader>
           {connecting ? (
-            <p className="text-muted-foreground text-center">Reconnecting...</p>
+            <p className="text-muted-foreground text-center py-4">Reconnecting...</p>
           ) : (
-          <form onSubmit={handleSubmit}>
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Access Code
-            </Label>
-            <Input
-              type="text"
-              autoComplete="off"
-              maxLength={6}
-              value={token}
-              onChange={(e) => setToken(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Access Code
+              </Label>
+              <Input
+                type="text"
+                autoComplete="off"
+                maxLength={6}
+                value={token}
+                onChange={(e) => setToken(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
               placeholder="ABC123"
               autoFocus
               disabled={connecting}
-              className="text-center tracking-[0.3em] text-2xl"
+              className="text-center tracking-[0.3em] text-2xl mt-1.5"
             />
-            {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-            <div className="mt-5">
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={token.length !== 6 || connecting}
-              >
-                Connect
-              </Button>
+              {error && <p className="text-xs text-destructive mt-1">{error}</p>}
             </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={token.length !== 6 || connecting}
+            >
+              Connect
+            </Button>
           </form>
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MobileNavMenu — hamburger menu for project/tab navigation on small screens
+// ---------------------------------------------------------------------------
+
+interface ProjectGroup {
+  projectId: string;
+  label: string;
+  tabs: Tab[];
+}
+
+function groupTabsByProject(tabs: Tab[]): ProjectGroup[] {
+  const map = new Map<string, Tab[]>();
+  for (const tab of tabs) {
+    const key = tab.projectId;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(tab);
+  }
+  return Array.from(map.entries()).map(([projectId, projectTabs]) => {
+    // Use the cwd of the first tab as the project label (last path segment)
+    const cwd = projectTabs[0].cwd;
+    const label = cwd.split(/[\\/]/).filter(Boolean).pop() || cwd;
+    return { projectId, label, tabs: projectTabs };
+  });
+}
+
+function MobileNavMenu({ tabs, activeTabId, onSelectTab }: {
+  tabs: Tab[];
+  activeTabId: string | null;
+  onSelectTab: (tabId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const groups = useMemo(() => groupTabsByProject(tabs), [tabs]);
+  const multiProject = groups.length > 1;
+
+  const handleSelect = (tabId: string) => {
+    onSelectTab(tabId);
+    setOpen(false);
+  };
+
+  return (
+    <div className="mobile-nav-menu">
+      <button
+        className="text-muted-foreground hover:text-foreground p-2"
+        onClick={() => setOpen(!open)}
+        title="Navigate tabs"
+      >
+        <Menu size={20} />
+      </button>
+      {open && createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0"
+            style={{ zIndex: 9998 }}
+            onClick={() => setOpen(false)}
+          />
+          {/* Dropdown */}
+          <div
+            className="fixed left-0 right-0 bg-[hsl(var(--project-hue)_30%_14%)] border-b border-border max-h-[60vh] overflow-y-auto shadow-lg"
+            style={{ top: '36px', zIndex: 9999 }}
+          >
+            {groups.map((group) => (
+              <div key={group.projectId}>
+                {multiProject && (
+                  <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/50">
+                    {group.label}
+                  </div>
+                )}
+                {group.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent/50 transition-colors',
+                      tab.id === activeTabId && 'bg-accent text-accent-foreground'
+                    )}
+                    onClick={() => handleSelect(tab.id)}
+                  >
+                    <TabIndicator status={tab.status} />
+                    <span className="truncate">{tab.name || tab.defaultName}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
@@ -260,27 +355,32 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
   const noop = () => {};
 
   return (
-    <div className="flex flex-col h-dvh">
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        renamingTabId={null}
-        onSelectTab={handleSelectTab}
-        onCloseTab={noop}
-        onRenameTab={handleRenameTab}
-        onRenameHandled={noop}
-        onNewClaudeTab={handleNewClaudeTab}
-        onNewWorktreeTab={tryShowWorktreeDialog}
-        onNewShellTab={noop}
-        onReorderTabs={noop}
-        onRefreshTab={noop}
-        onManageWorktrees={noop}
-        onManageHooks={noop}
-        remoteInfo={remoteInfo}
-        onActivateRemote={noop}
-        onDeactivateRemote={noop}
-      />
-      <div className="flex-1 relative overflow-auto [-webkit-overflow-scrolling:touch]" data-web-terminal>
+    <div className="flex flex-col h-dvh overflow-hidden">
+      <div className="flex items-center bg-[hsl(var(--project-hue)_30%_18%)] border-b border-border" data-web-tabbar>
+        <MobileNavMenu tabs={tabs} activeTabId={activeTabId} onSelectTab={handleSelectTab} />
+        <div className="flex-1 min-w-0 desktop-tabbar">
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            renamingTabId={null}
+            onSelectTab={handleSelectTab}
+            onCloseTab={noop}
+            onRenameTab={handleRenameTab}
+            onRenameHandled={noop}
+            onNewClaudeTab={handleNewClaudeTab}
+            onNewWorktreeTab={tryShowWorktreeDialog}
+            onNewShellTab={noop}
+            onReorderTabs={noop}
+            onRefreshTab={noop}
+            onManageWorktrees={noop}
+            onManageHooks={noop}
+            remoteInfo={remoteInfo}
+            onActivateRemote={noop}
+            onDeactivateRemote={noop}
+          />
+        </div>
+      </div>
+      <div className="flex-1 relative overflow-auto [-webkit-overflow-scrolling:touch] min-h-0" data-web-terminal>
         {tabs.map((tab) => (
           <Terminal
             key={tab.id}
@@ -291,7 +391,9 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
           />
         ))}
       </div>
-      <StatusBar tabs={tabs} />
+      <div data-web-statusbar>
+        <StatusBar tabs={tabs} />
+      </div>
       {showWorktreeDialog && (
         <WorktreeNameDialog
           onCreateWithWorktree={handleNewWorktreeTab}
@@ -358,7 +460,7 @@ function DisconnectedScreen({ onReconnected }: {
   return (
     <div className="flex flex-col h-dvh">
       <Dialog open>
-        <DialogContent className="max-w-[480px] text-center">
+        <DialogContent className="text-center" showCloseButton={false}>
           <DialogHeader className="text-center">
             <DialogTitle className="text-xl">Disconnected</DialogTitle>
           </DialogHeader>

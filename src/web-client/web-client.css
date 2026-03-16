@@ -15,3 +15,56 @@ body {
   height: max-content;
   min-height: 100%;
 }
+
+/* -webkit-app-region is meaningless in a browser and can cause click issues */
+.\[-webkit-app-region\:drag\] {
+  -webkit-app-region: unset !important;
+}
+
+/* ── Tailwind v4 content scanning workaround ─────────────────────────
+   @tailwindcss/vite fails to generate CSS for many utilities used by
+   renderer components (src/renderer/) when the Vite root is src/web-client/.
+   Affected: arbitrary values (top-[50%], translate-x-[-50%]), and some
+   standard utilities (whitespace-nowrap, text-ellipsis) from shared
+   components like Dialog and StatusBar.
+   Fix: apply the missing rules directly via CSS selectors. */
+
+/* Dialog centering (DialogContent from shadcn/ui) */
+[data-slot="dialog-content"] {
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  max-width: min(calc(100% - 2rem), 32rem);
+}
+
+/* StatusBar shortcuts truncation */
+[data-web-statusbar] .ml-auto {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Prevent TabBar and StatusBar wrappers from collapsing in the flex column */
+[data-web-tabbar],
+[data-web-statusbar] {
+  flex-shrink: 0;
+}
+
+/* Mobile nav menu: hidden on desktop, shown on mobile */
+.mobile-nav-menu {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  /* Show mobile nav hamburger */
+  .mobile-nav-menu {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Hide the desktop TabBar on narrow screens — navigation is via hamburger */
+  .desktop-tabbar {
+    display: none;
+  }
+}

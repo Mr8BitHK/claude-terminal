@@ -60,7 +60,7 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarP
           {' '}{hookStatus.hookName}{hookStatus.status === 'running' ? '...' : ''}
         </span>
       )}
-      <span className="ml-auto">
+      <span className="ml-auto overflow-hidden whitespace-nowrap text-ellipsis min-w-0">
         Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P Projects{shellHint ? ` | ${shellHint}` : ''} | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
       </span>
     </div>
