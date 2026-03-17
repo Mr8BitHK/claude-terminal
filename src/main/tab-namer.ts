@@ -27,11 +27,13 @@ export function createTabNamer(deps: TabNamerDeps) {
     namingQueue = namingQueue.then(() => new Promise<void>((resolve) => {
       const { command: cmd, args: baseArgs } = getClaudeCommand([
         '-p', '--no-session-persistence', '--model', 'claude-haiku-4-5-20251001',
+        '--tools', '', '--setting-sources', '',
       ]);
 
       log.debug('[callHaikuForName] spawning:', cmd, baseArgs.join(' '));
       const isWindows = process.platform === 'win32';
-      const child = execFile(cmd, baseArgs, { timeout: 30000 }, (err, stdout, stderr) => {
+      // Run from homedir to avoid loading project CLAUDE.md files into context
+      const child = execFile(cmd, baseArgs, { timeout: 30000, cwd: os.homedir() }, (err, stdout, stderr) => {
         if (err) {
           log.error('[callHaikuForName] FAILED:', err.message);
           log.error('[callHaikuForName] stderr:', stderr);
@@ -70,7 +72,7 @@ export function createTabNamer(deps: TabNamerDeps) {
 
   function generateTabName(tabId: string, prompt: string) {
     log.debug('[generateTabName] starting for tab', tabId, 'prompt:', prompt.substring(0, 80));
-    const namePrompt = `Generate a short tab title (3-5 words) for a coding conversation that starts with this message. Reply with ONLY the title, no quotes, no punctuation:\n\n${prompt}`;
+    const namePrompt = `Generate a short tab title (3-5 words) for a coding conversation that starts with this message. Reply with ONLY the title, no quotes, no punctuation:\n\n${prompt.substring(0, 500)}`;
     callHaikuForName(tabId, namePrompt);
   }
 
