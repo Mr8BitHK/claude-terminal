@@ -75,6 +75,8 @@ const api = {
     ipcRenderer.invoke('settings:removeRecentDir', dir),
   getPermissionMode: (): Promise<PermissionMode> =>
     ipcRenderer.invoke('settings:permissionMode'),
+  setPermissionMode: (mode: PermissionMode): Promise<void> =>
+    ipcRenderer.invoke('settings:setPermissionMode', mode),
 
   // Hook config
   getHookConfig: (projectId?: string): Promise<RepoHookConfig> =>

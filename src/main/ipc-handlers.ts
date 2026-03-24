@@ -684,6 +684,11 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     return settings.getPermissionMode();
   });
 
+  ipcMain.handle('settings:setPermissionMode', async (_event, mode: PermissionMode) => {
+    state.permissionMode = mode;
+    await settings.setPermissionMode(mode);
+  });
+
   // ---- Hook Config ----
   ipcMain.handle('hookConfig:load', async (_event, projectId?: string) => {
     const project = projectId ? state.projectManager?.getProject(projectId) : undefined;

@@ -313,6 +313,7 @@ export class WebSocketBridge {
       getRecentDirs: async (): Promise<string[]> => [],
       removeRecentDir: async (): Promise<void> => {},
       getPermissionMode: async () => 'default' as const,
+      setPermissionMode: async (): Promise<void> => {},
 
       // Hook config (stubs — not available remotely)
       getHookConfig: async () => ({ hooks: {} }),

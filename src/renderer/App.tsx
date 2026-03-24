@@ -60,6 +60,7 @@ export default function App() {
   );
   const [hookStatus, setHookStatus] = useState<{ hookName: string; status: 'running' | 'done' | 'failed'; error?: string } | null>(null);
   const hookDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypassPermissions');
   const [worktreeCloseConfirm, setWorktreeCloseConfirm] = useState<{
     tabId: string; worktreeName: string; clean: boolean; changesCount: number;
   } | null>(null);
@@ -270,6 +271,7 @@ export default function App() {
 
       const savedMode = await window.claudeTerminal.getPermissionMode();
       if (cancelled) return;
+      setPermissionMode(savedMode);
 
       const result = await window.claudeTerminal.startSession(cliDir, savedMode);
       if (cancelled) return;
@@ -473,6 +475,7 @@ export default function App() {
   }, [appState, handleAddProject, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleSelectProject, handleCloseTab, tryShowWorktreeDialog]);
 
   const handleStartSession = useCallback(async (dir: string, mode: PermissionMode) => {
+    setPermissionMode(mode);
     const result = await window.claudeTerminal.startSession(dir, mode);
     setWorkspaceDir(dir);
 
@@ -505,6 +508,11 @@ export default function App() {
       const tab = await window.claudeTerminal.createTab(projectId, null);
       setActiveTabId(tab.id);
     }
+  }, []);
+
+  const handlePermissionModeChange = useCallback((mode: PermissionMode) => {
+    setPermissionMode(mode);
+    window.claudeTerminal.setPermissionMode(mode);
   }, []);
 
   if (appState === 'startup') {
@@ -560,7 +568,7 @@ export default function App() {
             />
           ))}
         </div>
-        <StatusBar tabs={activeProjectTabs} hookStatus={hookStatus} />
+        <StatusBar tabs={activeProjectTabs} hookStatus={hookStatus} permissionMode={permissionMode} onPermissionModeChange={handlePermissionModeChange} />
       </div>
       {showWorktreeDialog && (
         <WorktreeNameDialog
