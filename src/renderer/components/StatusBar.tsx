@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import type { Tab, TabStatus } from '../../shared/types';
+import type { Tab, TabStatus, PermissionMode } from '../../shared/types';
 import { useShellOptions } from '../shell-context';
 import TabIndicator from './TabIndicator';
 
@@ -23,12 +23,26 @@ const hookColorMap: Record<string, string> = {
   failed: 'text-destructive',
 };
 
+const PERMISSION_MODE_ORDER: PermissionMode[] = [
+  'bypassPermissions', 'auto', 'acceptEdits', 'plan', 'default',
+];
+
+const PERMISSION_MODE_LABELS: Record<PermissionMode, string> = {
+  bypassPermissions: 'Bypass',
+  auto: 'Auto',
+  acceptEdits: 'Accept Edits',
+  plan: 'Plan',
+  default: 'Default',
+};
+
 interface StatusBarProps {
   tabs: Tab[];
   hookStatus?: { hookName: string; status: 'running' | 'done' | 'failed'; error?: string } | null;
+  permissionMode: PermissionMode;
+  onPermissionModeChange: (mode: PermissionMode) => void;
 }
 
-const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarProps) {
+const StatusBar = React.memo(function StatusBar({ tabs, hookStatus, permissionMode, onPermissionModeChange }: StatusBarProps) {
   const shellOptions = useShellOptions();
   const isWindows = window.claudeTerminal?.platform === 'win32';
   const shellHint = shellOptions.length >= 2 && isWindows
@@ -40,6 +54,12 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarP
   for (const tab of tabs) {
     counts.set(tab.status, (counts.get(tab.status) ?? 0) + 1);
   }
+
+  const cyclePermissionMode = useCallback(() => {
+    const idx = PERMISSION_MODE_ORDER.indexOf(permissionMode);
+    const next = PERMISSION_MODE_ORDER[(idx + 1) % PERMISSION_MODE_ORDER.length];
+    onPermissionModeChange(next);
+  }, [permissionMode, onPermissionModeChange]);
 
   return (
     <div className="flex gap-4 px-3 py-0.5 bg-[hsl(var(--project-hue)_30%_18%)] text-muted-foreground text-xs min-h-[22px] items-center border-t border-border">
@@ -60,6 +80,13 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus }: StatusBarP
           {' '}{hookStatus.hookName}{hookStatus.status === 'running' ? '...' : ''}
         </span>
       )}
+      <button
+        onClick={cyclePermissionMode}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+        title={`Permission mode: ${PERMISSION_MODE_LABELS[permissionMode]} (click to cycle — affects new tabs only)`}
+      >
+        Mode: {PERMISSION_MODE_LABELS[permissionMode]}
+      </button>
       <span className="ml-auto overflow-hidden whitespace-nowrap text-ellipsis min-w-0">
         Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P Projects{shellHint ? ` | ${shellHint}` : ''} | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
       </span>

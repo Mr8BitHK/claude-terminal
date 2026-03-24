@@ -2,7 +2,7 @@ export type TabStatus = 'new' | 'working' | 'idle' | 'requires_response' | 'shel
 
 export type TabType = 'claude' | 'shell';
 
-export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions';
+export type PermissionMode = 'default' | 'auto' | 'plan' | 'acceptEdits' | 'bypassPermissions';
 
 export interface Tab {
   id: string;
@@ -69,6 +69,7 @@ export interface WorkspaceConfig {
 
 export const PERMISSION_FLAGS: Record<PermissionMode, string[]> = {
   default: [],
+  auto: ['--enable-auto-mode'],
   plan: ['--plan'],
   acceptEdits: ['--allowedTools', 'Edit,Write,NotebookEdit'],
   bypassPermissions: ['--dangerously-skip-permissions'],

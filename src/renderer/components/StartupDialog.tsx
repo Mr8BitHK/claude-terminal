@@ -15,6 +15,7 @@ interface StartupDialogProps {
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string }[] = [
   { value: 'bypassPermissions', label: 'Bypass' },
+  { value: 'auto', label: 'Auto' },
   { value: 'acceptEdits', label: 'Accept Edits' },
   { value: 'plan', label: 'Plan Mode' },
   { value: 'default', label: 'Default' },
