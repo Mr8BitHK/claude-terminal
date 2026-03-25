@@ -17,6 +17,7 @@ import WorktreeNameDialog from './components/WorktreeNameDialog';
 import WorktreeManagerDialog from './components/WorktreeManagerDialog';
 import WorktreeCloseDialog from './components/WorktreeCloseDialog';
 import HookManagerDialog from './components/HookManagerDialog';
+import SettingsDialog from './components/SettingsDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
@@ -54,19 +55,26 @@ export default function App() {
   });
   const [branch, setBranch] = useState<string | null>(null);
   const [showHookManager, setShowHookManager] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [defaultShell, setDefaultShell] = useState<string | null>(null);
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const [availableShells, setAvailableShells] = useState<ShellOption[]>(
     () => getAllShellOptions(window.claudeTerminal?.platform ?? 'linux')
   );
+  const defaultShellRef = useRef(defaultShell);
+  defaultShellRef.current = defaultShell;
+  const availableShellsRef = useRef(availableShells);
+  availableShellsRef.current = availableShells;
   const [hookStatus, setHookStatus] = useState<{ hookName: string; status: 'running' | 'done' | 'failed'; error?: string } | null>(null);
   const hookDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [worktreeCloseConfirm, setWorktreeCloseConfirm] = useState<{
     tabId: string; worktreeName: string; clean: boolean; changesCount: number;
   } | null>(null);
 
-  // Fetch available shells (filter to installed ones)
+  // Fetch available shells (filter to installed ones) and default shell preference
   useEffect(() => {
     window.claudeTerminal.getAvailableShells().then(setAvailableShells).catch(() => {});
+    window.claudeTerminal.getDefaultShell().then(setDefaultShell).catch(() => {});
   }, []);
 
   // Filter tabs by active project
@@ -165,20 +173,32 @@ export default function App() {
 
   const handleNewShellTab = useCallback(async (shellType: string, afterTabId?: string) => {
     const tab = await window.claudeTerminal.createShellTab(shellType, afterTabId);
-    if (afterTabId) {
-      setTabs((prev) => {
-        const filtered = prev.filter(t => t.id !== tab.id);
+    setTabs((prev) => {
+      const filtered = prev.filter(t => t.id !== tab.id);
+      if (afterTabId) {
         const afterIdx = filtered.findIndex(t => t.id === afterTabId);
         if (afterIdx >= 0) {
           const next = [...filtered];
           next.splice(afterIdx + 1, 0, tab);
           return next;
         }
-        return [...filtered, tab];
-      });
-    }
+      }
+      return [...filtered, tab];
+    });
     setActiveTabId(tab.id);
     await window.claudeTerminal.switchTab(tab.id);
+  }, []);
+
+  const handleNewDefaultShellTab = useCallback(async (afterTabId?: string) => {
+    const shells = availableShellsRef.current;
+    const shellId = defaultShellRef.current ?? shells[0]?.id;
+    if (!shellId) return;
+    await handleNewShellTab(shellId, afterTabId);
+  }, [handleNewShellTab]);
+
+  const handleDefaultShellChange = useCallback(async (shellId: string) => {
+    setDefaultShell(shellId);
+    await window.claudeTerminal.setDefaultShell(shellId);
   }, []);
 
   const handleReorderTabs = useCallback((reordered: Tab[]) => {
@@ -442,7 +462,7 @@ export default function App() {
       addProject: handleAddProject,
       newTab: handleNewTabWithoutWorktree,
       newWorktreeTab: tryShowWorktreeDialog,
-      newShellTab: handleNewShellTab,
+      newDefaultShellTab: handleNewDefaultShellTab,
       closeTab: handleCloseTab,
       selectTab: handleSelectTab,
       selectProject: handleSelectProject,
@@ -470,7 +490,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [appState, handleAddProject, handleNewTabWithoutWorktree, handleNewShellTab, handleSelectTab, handleSelectProject, handleCloseTab, tryShowWorktreeDialog]);
+  }, [appState, handleAddProject, handleNewTabWithoutWorktree, handleNewDefaultShellTab, handleSelectTab, handleSelectProject, handleCloseTab, tryShowWorktreeDialog]);
 
   const handleStartSession = useCallback(async (dir: string, mode: PermissionMode) => {
     const result = await window.claudeTerminal.startSession(dir, mode);
@@ -536,6 +556,7 @@ export default function App() {
           tabs={activeProjectTabs}
           activeTabId={activeTabId}
           renamingTabId={renamingTabId}
+          defaultShell={defaultShell}
           onSelectTab={handleSelectTab}
           onCloseTab={handleCloseTab}
           onRenameTab={handleRenameTab}
@@ -547,6 +568,7 @@ export default function App() {
           onRefreshTab={handleRefreshTab}
           onManageWorktrees={() => setShowWorktreeManager(true)}
           onManageHooks={() => setShowHookManager(true)}
+          onOpenSettings={() => setShowSettings(true)}
           remoteInfo={remoteInfo}
           onActivateRemote={handleActivateRemote}
           onDeactivateRemote={handleDeactivateRemote}
@@ -599,6 +621,12 @@ export default function App() {
       {showHookManager && (
         <HookManagerDialog onClose={() => setShowHookManager(false)} />
       )}
+      <SettingsDialog
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        defaultShell={defaultShell}
+        onDefaultShellChange={handleDefaultShellChange}
+      />
       {showProjectSwitcher && (
         <ProjectSwitcherDialog
           projects={projects.map(p => ({

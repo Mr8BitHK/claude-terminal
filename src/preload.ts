@@ -75,6 +75,10 @@ const api = {
     ipcRenderer.invoke('settings:removeRecentDir', dir),
   getPermissionMode: (): Promise<PermissionMode> =>
     ipcRenderer.invoke('settings:permissionMode'),
+  getDefaultShell: (): Promise<string | null> =>
+    ipcRenderer.invoke('settings:getDefaultShell'),
+  setDefaultShell: (shellId: string | null): Promise<void> =>
+    ipcRenderer.invoke('settings:setDefaultShell', shellId),
 
   // Hook config
   getHookConfig: (projectId?: string): Promise<RepoHookConfig> =>
