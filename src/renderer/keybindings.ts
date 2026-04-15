@@ -8,8 +8,6 @@
  * To add a new keybinding: add one entry to the array below. Done.
  */
 
-import { getAllShellOptions } from '@shared/platform';
-
 export interface KeybindingContext {
   activeTabId: () => string | null;
   tabs: () => { id: string }[];
@@ -18,7 +16,7 @@ export interface KeybindingContext {
   addProject: () => void;
   newTab: () => void;
   newWorktreeTab: () => void;
-  newShellTab: (shellType: string, afterTabId?: string) => void;
+  newDefaultShellTab: (afterTabId?: string) => void;
   closeTab: (tabId: string) => void;
   selectTab: (tabId: string) => void;
   selectProject: (projectId: string) => void;
@@ -52,31 +50,12 @@ function cycleProject(ctx: KeybindingContext, direction: 1 | -1) {
   ctx.selectProject(projects[next].id);
 }
 
-// Shell keybindings are platform-dependent.
-// Ctrl+L conflicts with terminal clear-screen on all platforms, so we only
-// bind it on Windows (where the WSL shortcut was already established).
-const platform = window.claudeTerminal?.platform ?? 'linux';
-const shellOptions = getAllShellOptions(platform);
-const shellKeybindings: Keybinding[] = [];
-if (shellOptions.length >= 1) {
-  shellKeybindings.push({
-    mod: 'ctrl+shift', key: 'P',
-    action: (ctx) => ctx.newShellTab(shellOptions[0].id, ctx.activeTabId() ?? undefined),
-  });
-}
-if (shellOptions.length >= 2 && platform === 'win32') {
-  shellKeybindings.push({
-    mod: 'ctrl', key: 'l',
-    action: (ctx) => ctx.newShellTab(shellOptions[1].id, ctx.activeTabId() ?? undefined),
-  });
-}
-
 export const keybindings: Keybinding[] = [
   { mod: 'ctrl',       key: 'n',          action: (ctx) => ctx.addProject() },
   { mod: 'ctrl',       key: 't',          action: (ctx) => ctx.newTab() },
   { mod: 'ctrl',       key: 'w',          action: (ctx) => ctx.newWorktreeTab() },
   { mod: 'ctrl',       key: 'p',          action: (ctx) => ctx.openProjectSwitcher() },
-  ...shellKeybindings,
+  { mod: 'ctrl',       key: '`',          action: (ctx) => ctx.newDefaultShellTab(ctx.activeTabId() ?? undefined) },
   { mod: 'ctrl',       key: 'F4',         action: (ctx) => { const id = ctx.activeTabId(); if (id) ctx.closeTab(id); } },
   { mod: 'ctrl',       key: 'Tab',        action: (ctx) => cycleTab(ctx, 1) },
   { mod: 'ctrl+shift', key: 'Tab',        action: (ctx) => cycleTab(ctx, -1) },
