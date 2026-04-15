@@ -12,11 +12,13 @@ const SESSIONS_FILE = 'sessions.json';
 interface StoreData {
   recentDirs: string[];
   permissionMode: PermissionMode;
+  defaultShell: string | null;
 }
 
 const DEFAULTS: StoreData = {
   recentDirs: [],
   permissionMode: 'bypassPermissions',
+  defaultShell: null,
 };
 
 export class SettingsStore {
@@ -66,6 +68,15 @@ export class SettingsStore {
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     this.data.permissionMode = mode;
+    await this.save();
+  }
+
+  getDefaultShell(): string | null {
+    return this.data.defaultShell;
+  }
+
+  async setDefaultShell(shellId: string | null): Promise<void> {
+    this.data.defaultShell = shellId;
     await this.save();
   }
 

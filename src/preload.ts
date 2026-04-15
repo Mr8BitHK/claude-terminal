@@ -77,6 +77,10 @@ const api = {
     ipcRenderer.invoke('settings:permissionMode'),
   setPermissionMode: (mode: PermissionMode): Promise<void> =>
     ipcRenderer.invoke('settings:setPermissionMode', mode),
+  getDefaultShell: (): Promise<string | null> =>
+    ipcRenderer.invoke('settings:getDefaultShell'),
+  setDefaultShell: (shellId: string | null): Promise<void> =>
+    ipcRenderer.invoke('settings:setDefaultShell', shellId),
 
   // Hook config
   getHookConfig: (projectId?: string): Promise<RepoHookConfig> =>

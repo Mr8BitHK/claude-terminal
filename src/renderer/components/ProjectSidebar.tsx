@@ -51,15 +51,18 @@ export default function ProjectSidebar({
           const dirName = project.displayName ?? project.dir.split(/[/\\]/).pop() ?? project.dir;
           const isActive = project.id === activeProjectId;
           const hue = PROJECT_COLORS[project.colorIndex % PROJECT_COLORS.length].hue;
+          const counts = tabCounts[project.id];
+          const waiting = counts?.requires_response ?? 0;
+          const working = counts?.working ?? 0;
 
           return (
             <button
               key={project.id}
               data-active={isActive}
               className={cn(
-                'border-none border-l-[3px] border-l-transparent',
-                'text-muted-foreground cursor-pointer text-left font-inherit',
-                '[writing-mode:vertical-lr] whitespace-nowrap px-3 py-2 text-[11px]',
+                'flex flex-col items-center gap-1 border-none border-l-[3px] border-l-transparent',
+                'text-muted-foreground cursor-pointer font-inherit',
+                'whitespace-nowrap py-2 text-[11px]',
                 isActive && 'text-foreground',
               )}
               style={{
@@ -68,9 +71,20 @@ export default function ProjectSidebar({
               }}
               onClick={() => onSelectProject(project.id)}
               onContextMenu={(e) => handleContextMenu(e, project.id)}
-              title={dirName}
+              title={`${dirName}${waiting ? ` — ${waiting} waiting` : ''}${working ? ` — ${working} working` : ''}`}
             >
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap">{dirName}</span>
+              {/* Status dots */}
+              {(waiting > 0 || working > 0) && (
+                <span className="flex flex-col items-center gap-1">
+                  {waiting > 0 && (
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                  )}
+                  {working > 0 && (
+                    <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: '#3b82f6' }} />
+                  )}
+                </span>
+              )}
+              <span className="[writing-mode:vertical-lr] overflow-hidden text-ellipsis whitespace-nowrap">{dirName}</span>
             </button>
           );
         })}

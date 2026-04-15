@@ -12,6 +12,7 @@ interface TabBarProps {
   tabs: TabType[];
   activeTabId: string | null;
   renamingTabId: string | null;
+  defaultShell: string | null;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onRenameTab: (tabId: string, name: string) => void;
@@ -23,19 +24,17 @@ interface TabBarProps {
   onRefreshTab: (tabId: string) => void;
   onManageWorktrees: () => void;
   onManageHooks: () => void;
+  onOpenSettings: () => void;
   remoteInfo: RemoteAccessInfo;
   onActivateRemote: () => void;
   onDeactivateRemote: () => void;
 }
 
-// Shortcut labels — Ctrl+L (second shell) only on Windows to avoid terminal clear-screen conflict
-const isWindows = window.claudeTerminal?.platform === 'win32';
-const shellShortcuts = isWindows ? ['Ctrl+Shift+P', 'Ctrl+L'] : ['Ctrl+Shift+P'];
-
 export default function TabBar({
   tabs,
   activeTabId,
   renamingTabId,
+  defaultShell,
   onSelectTab,
   onCloseTab,
   onRenameTab,
@@ -47,6 +46,7 @@ export default function TabBar({
   onRefreshTab,
   onManageWorktrees,
   onManageHooks,
+  onOpenSettings,
   remoteInfo,
   onActivateRemote,
   onDeactivateRemote,
@@ -138,14 +138,17 @@ export default function TabBar({
             <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+W</span>
           </DropdownMenuItem>
           {shellOptions.length > 0 && <DropdownMenuSeparator />}
-          {shellOptions.map((shell, i) => (
-            <DropdownMenuItem key={shell.id} onClick={() => onNewShellTab(shell.id, activeTabId ?? undefined)}>
-              <span>{shell.label}</span>
-              {i < shellShortcuts.length && (
-                <span className="ml-auto text-[11px] text-muted-foreground">{shellShortcuts[i]}</span>
-              )}
-            </DropdownMenuItem>
-          ))}
+          {shellOptions.map((shell) => {
+            const isDefault = defaultShell ? shell.id === defaultShell : shell.id === shellOptions[0]?.id;
+            return (
+              <DropdownMenuItem key={shell.id} onClick={() => onNewShellTab(shell.id, activeTabId ?? undefined)}>
+                <span>{shell.label}</span>
+                {isDefault && (
+                  <span className="ml-auto text-[11px] text-muted-foreground">Ctrl+`</span>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
       <div className="flex items-center ml-auto [-webkit-app-region:no-drag]">
@@ -155,7 +158,7 @@ export default function TabBar({
           onActivate={onActivateRemote}
           onDeactivate={onDeactivateRemote}
         />
-        <HamburgerMenu onManageWorktrees={onManageWorktrees} onManageHooks={onManageHooks} />
+        <HamburgerMenu onManageWorktrees={onManageWorktrees} onManageHooks={onManageHooks} onOpenSettings={onOpenSettings} />
       </div>
     </div>
   );

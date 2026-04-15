@@ -88,7 +88,7 @@ const StatusBar = React.memo(function StatusBar({ tabs, hookStatus, permissionMo
         Mode: {PERMISSION_MODE_LABELS[permissionMode]}
       </button>
       <span className="ml-auto overflow-hidden whitespace-nowrap text-ellipsis min-w-0">
-        Ctrl+T Claude | Ctrl+W Worktree | Ctrl+P Projects{shellHint ? ` | ${shellHint}` : ''} | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
+        Ctrl+T Claude | Ctrl+W Worktree | Ctrl+` Terminal | Ctrl+P Projects | Ctrl+F4 close | Ctrl+Tab switch | F2 rename
       </span>
     </div>
   );

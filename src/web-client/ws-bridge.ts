@@ -314,6 +314,8 @@ export class WebSocketBridge {
       removeRecentDir: async (): Promise<void> => {},
       getPermissionMode: async () => 'default' as const,
       setPermissionMode: async (): Promise<void> => {},
+      getDefaultShell: async () => null,
+      setDefaultShell: async () => {},
 
       // Hook config (stubs — not available remotely)
       getHookConfig: async () => ({ hooks: {} }),

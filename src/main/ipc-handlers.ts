@@ -689,6 +689,14 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): { cleanup: () => void
     await settings.setPermissionMode(mode);
   });
 
+  ipcMain.handle('settings:getDefaultShell', async () => {
+    return settings.getDefaultShell();
+  });
+
+  ipcMain.handle('settings:setDefaultShell', async (_event, shellId: string | null) => {
+    await settings.setDefaultShell(shellId);
+  });
+
   // ---- Hook Config ----
   ipcMain.handle('hookConfig:load', async (_event, projectId?: string) => {
     const project = projectId ? state.projectManager?.getProject(projectId) : undefined;

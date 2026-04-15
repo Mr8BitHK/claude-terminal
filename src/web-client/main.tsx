@@ -363,6 +363,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
             tabs={tabs}
             activeTabId={activeTabId}
             renamingTabId={null}
+            defaultShell={null}
             onSelectTab={handleSelectTab}
             onCloseTab={noop}
             onRenameTab={handleRenameTab}
@@ -374,6 +375,7 @@ function RemoteApp({ initialTabs, initialActiveTabId, initialTermSizes, onDiscon
             onRefreshTab={noop}
             onManageWorktrees={noop}
             onManageHooks={noop}
+            onOpenSettings={noop}
             remoteInfo={remoteInfo}
             onActivateRemote={noop}
             onDeactivateRemote={noop}
